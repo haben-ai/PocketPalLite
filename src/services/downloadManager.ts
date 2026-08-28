@@ -26,24 +26,20 @@ export type DownloadHandle = {
   completion: Promise<void>;
 };
 
-export async function downloadModel(
-  model: ModelInfo,
+/**
+ * Low-level single-file download primitive, reused by both the LLM
+ * downloadModel() below and the translation model downloader
+ * (translationDownloadManager.ts) -- deliberately has no free-space check
+ * or registry side effects, since the translation downloader needs to
+ * aggregate progress/space checks across multiple files, not one.
+ */
+export function downloadToFile(
+  url: string,
+  toFile: string,
   onProgress: (fraction: number, bytesWritten: number) => void,
-): Promise<DownloadHandle> {
-  await ensureModelsDir();
-
-  const freeSpace = await getFreeStorageBytes();
-  if (freeSpace < model.sizeBytes * 1.05) {
-    throw new Error(
-      `Not enough free storage. Need ~${(model.sizeBytes / 1e9).toFixed(
-        1,
-      )} GB, only ${(freeSpace / 1e9).toFixed(1)} GB free.`,
-    );
-  }
-
-  const toFile = modelFilePath(model);
+): DownloadHandle {
   const {jobId, promise} = RNFS.downloadFile({
-    fromUrl: model.downloadUrl,
+    fromUrl: url,
     toFile,
     progressDivider: 2,
     begin: () => {
@@ -61,6 +57,34 @@ export async function downloadModel(
       await RNFS.unlink(toFile).catch(() => undefined);
       throw new Error(`Download failed with status ${result.statusCode}`);
     }
+  });
+
+  return {
+    jobId,
+    cancel: () => RNFS.stopDownload(jobId),
+    completion,
+  };
+}
+
+export async function downloadModel(
+  model: ModelInfo,
+  onProgress: (fraction: number, bytesWritten: number) => void,
+): Promise<DownloadHandle> {
+  await ensureModelsDir();
+
+  const freeSpace = await getFreeStorageBytes();
+  if (freeSpace < model.sizeBytes * 1.05) {
+    throw new Error(
+      `Not enough free storage. Need ~${(model.sizeBytes / 1e9).toFixed(
+        1,
+      )} GB, only ${(freeSpace / 1e9).toFixed(1)} GB free.`,
+    );
+  }
+
+  const toFile = modelFilePath(model);
+  const handle = downloadToFile(model.downloadUrl, toFile, onProgress);
+
+  const completion = handle.completion.then(async () => {
     await registerDownloadedModel({
       modelId: model.id,
       filePath: toFile,
@@ -71,11 +95,7 @@ export async function downloadModel(
     });
   });
 
-  return {
-    jobId,
-    cancel: () => RNFS.stopDownload(jobId),
-    completion,
-  };
+  return {...handle, completion};
 }
 
 export async function deleteDownloadedModel(filePath: string): Promise<void> {

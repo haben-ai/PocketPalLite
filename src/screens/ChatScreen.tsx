@@ -10,13 +10,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {LlamaContext} from '@pocketpalai/llama.rn';
 import {colors, spacing, typography} from '../theme';
 import {ChatMessage} from '../types';
 import {getModelById} from '../data/models';
 import {getDownloadedModel} from '../storage/modelRegistry';
 import {getMessages, saveMessages, touchConversation, deriveTitle} from '../storage/conversations';
-import {getLlamaContext} from '../services/llamaSession';
+import {getInferenceEngine} from '../services/llamaSession';
+import {InferenceEngine} from '../services/inferenceEngine';
+import {truncateMessagesToContext, DEFAULT_CONTEXT_SIZE} from '../services/contextWindow';
+import {getLanguagePipeline, DEFAULT_LANGUAGE} from '../services/languagePipeline';
 import {ChatBubble} from '../components/ChatBubble';
 
 const STOP_WORDS = [
@@ -49,7 +51,7 @@ export function ChatScreen({
   const [streamingText, setStreamingText] = useState<string | null>(null);
   const [status, setStatus] = useState('Loading model...');
   const [ready, setReady] = useState(false);
-  const contextRef = useRef<LlamaContext | null>(null);
+  const engineRef = useRef<InferenceEngine | null>(null);
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   const modelName =
@@ -70,7 +72,7 @@ export function ChatScreen({
       }
 
       try {
-        const ctx = await getLlamaContext(
+        const engine = await getInferenceEngine(
           modelId,
           downloaded.filePath,
           progress => {
@@ -80,7 +82,7 @@ export function ChatScreen({
           },
         );
         if (!cancelled) {
-          contextRef.current = ctx;
+          engineRef.current = engine;
           setReady(true);
           setStatus('');
         }
@@ -97,8 +99,8 @@ export function ChatScreen({
 
   const handleSend = async () => {
     const trimmed = input.trim();
-    const ctx = contextRef.current;
-    if (!trimmed || !ctx || streamingText !== null) {
+    const engine = engineRef.current;
+    if (!trimmed || !engine || streamingText !== null) {
       return;
     }
 
@@ -108,6 +110,9 @@ export function ChatScreen({
       content: trimmed,
       createdAt: Date.now(),
     };
+    // The full, untruncated history is what gets persisted -- the user
+    // always sees their complete conversation. Only the subset sent to the
+    // model (below) is ever trimmed.
     const nextMessages = [...messages, userMessage];
     setMessages(nextMessages);
     setInput('');
@@ -120,21 +125,50 @@ export function ChatScreen({
 
     setStreamingText('');
     try {
-      const result = await ctx.completion(
+      // User -> LanguagePipeline -> InferenceEngine. NoOpLanguagePipeline
+      // makes detectLanguage/translateIn identity operations, so this is a
+      // no-op today; a real pipeline plugs in via setLanguagePipeline()
+      // without any change here.
+      const pipeline = getLanguagePipeline();
+      const detectedLanguage = await pipeline.detectLanguage(trimmed);
+      const llmInputText = await pipeline.translateIn(
+        trimmed,
+        detectedLanguage,
+        DEFAULT_LANGUAGE,
+      );
+
+      const contextMessages = truncateMessagesToContext(
+        nextMessages,
+        DEFAULT_CONTEXT_SIZE,
+      );
+      const enginePayload = contextMessages.map(m =>
+        m.id === userMessage.id
+          ? {role: m.role, content: llmInputText}
+          : {role: m.role, content: m.content},
+      );
+
+      const result = await engine.completion(
         {
-          messages: nextMessages.map(m => ({role: m.role, content: m.content})),
+          messages: enginePayload,
           n_predict: 512,
           stop: STOP_WORDS,
         },
-        data => {
-          setStreamingText(prev => (prev ?? '') + data.token);
+        token => {
+          setStreamingText(prev => (prev ?? '') + token);
         },
+      );
+
+      // InferenceEngine -> LanguagePipeline -> User.
+      const translatedOut = await pipeline.translateOut(
+        result.text?.trim() || '',
+        DEFAULT_LANGUAGE,
+        detectedLanguage,
       );
 
       const assistantMessage: ChatMessage = {
         id: newId(),
         role: 'assistant',
-        content: result.text?.trim() || '(no response)',
+        content: translatedOut || '(no response)',
         createdAt: Date.now(),
       };
       const finalMessages = [...nextMessages, assistantMessage];
