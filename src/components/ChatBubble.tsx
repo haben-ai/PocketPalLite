@@ -3,7 +3,7 @@ import {Image, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import {colors, radius, spacing, typography} from '../theme';
 import {ChatMessage} from '../types';
-import {BlinkingCursor} from './BlinkingCursor';
+import {TypingIndicator} from './TypingIndicator';
 
 export function ChatBubble({
   message,
@@ -20,6 +20,10 @@ export function ChatBubble({
 }) {
   const isUser = message.role === 'user';
   const showActions = !isStreaming && (isUser ? !!onEdit : true);
+  // While waiting for the first token, show the wave instead of an empty
+  // bubble; once text starts arriving, just show it plainly (matching
+  // ChatGPT -- no trailing cursor once streaming is underway).
+  const waitingForFirstToken = isStreaming && message.content.length === 0;
 
   return (
     <View
@@ -27,7 +31,7 @@ export function ChatBubble({
         styles.row,
         {justifyContent: isUser ? 'flex-end' : 'flex-start'},
       ]}>
-      <View style={{maxWidth: '82%'}}>
+      <View style={isUser ? styles.userMaxWidth : styles.assistantMaxWidth}>
         <View style={[styles.bubble, isUser ? styles.userBubble : styles.assistantBubble]}>
           {message.imagePath && (
             <Image
@@ -36,10 +40,11 @@ export function ChatBubble({
               resizeMode="cover"
             />
           )}
-          <View style={styles.textRow}>
+          {waitingForFirstToken ? (
+            <TypingIndicator />
+          ) : (
             <Text style={styles.text}>{message.content}</Text>
-            {isStreaming && <BlinkingCursor />}
-          </View>
+          )}
         </View>
 
         {showActions && (
@@ -70,6 +75,8 @@ export function ChatBubble({
 
 const styles = StyleSheet.create({
   row: {flexDirection: 'row', marginVertical: 6, paddingHorizontal: spacing.md},
+  userMaxWidth: {maxWidth: '82%'},
+  assistantMaxWidth: {maxWidth: '100%'},
   bubble: {
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -79,11 +86,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.userBubble,
     borderBottomRightRadius: 4,
   },
+  // No fill, no border -- assistant replies are plain text on the
+  // background, matching ChatGPT (only user messages get a bubble).
   assistantBubble: {
     backgroundColor: colors.assistantBubble,
-    borderBottomLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: colors.border,
+    paddingHorizontal: 0,
   },
   image: {
     width: '100%',
@@ -92,8 +99,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     backgroundColor: colors.surfaceContainerHigh,
   },
-  textRow: {flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap'},
-  text: {color: colors.textPrimary, fontSize: 15, lineHeight: 21},
+  text: {color: colors.textPrimary, fontSize: 15, lineHeight: 22},
   actions: {
     flexDirection: 'row',
     gap: spacing.md,

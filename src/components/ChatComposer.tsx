@@ -81,14 +81,14 @@ export function ChatComposer({
         />
         {isGenerating ? (
           <TouchableOpacity onPress={onStop} style={styles.stopButton}>
-            <Text style={styles.stopLabel}>Stop</Text>
+            <View style={styles.stopIcon} />
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
             onPress={onSend}
             disabled={!canSend}
-            style={[styles.sendButton, !canSend && {opacity: 0.4}]}>
-            <Text style={styles.sendLabel}>Send</Text>
+            style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}>
+            <Text style={styles.sendLabel}>↑</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -157,23 +157,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  // Circular icon buttons, monochrome (white bg / near-black glyph),
+  // matching ChatGPT's send button -- no color accent, no glow.
   sendButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.accent,
-    borderRadius: 18,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    shadowColor: colors.glowCore,
-    shadowOpacity: 0.55,
-    shadowRadius: 10,
-    shadowOffset: {width: 0, height: 0},
-    elevation: 6,
   },
-  sendLabel: {color: '#fff', fontWeight: '700'},
+  sendButtonDisabled: {backgroundColor: colors.surfaceContainerHigh},
+  sendLabel: {color: colors.onAccent, fontWeight: '700', fontSize: 18, lineHeight: 20},
   stopButton: {
-    backgroundColor: colors.danger,
+    width: 36,
+    height: 36,
     borderRadius: 18,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accent,
   },
-  stopLabel: {color: '#fff', fontWeight: '700'},
+  stopIcon: {
+    width: 12,
+    height: 12,
+    borderRadius: 2,
+    backgroundColor: colors.onAccent,
+  },
 });
