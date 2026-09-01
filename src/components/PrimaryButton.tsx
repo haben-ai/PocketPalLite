@@ -1,12 +1,13 @@
-import React from 'react';
+import React, {useRef} from 'react';
 import {
   ActivityIndicator,
+  Animated,
   StyleSheet,
   Text,
   TouchableOpacity,
   ViewStyle,
 } from 'react-native';
-import {colors, radius, spacing} from '../theme';
+import {colors, elevation, radius, spacing} from '../theme';
 
 type Props = {
   label: string;
@@ -25,29 +26,43 @@ export function PrimaryButton({
   loading,
   style,
 }: Props) {
+  const scale = useRef(new Animated.Value(1)).current;
   const bg =
     variant === 'primary'
       ? colors.accent
       : variant === 'danger'
       ? colors.danger
-      : colors.surfaceRaised;
-  const textColor = variant === 'secondary' ? colors.textPrimary : '#fff';
+      : colors.surfaceContainerHigh;
+  const textColor = variant === 'secondary' ? colors.textPrimary : colors.onAccent;
+
+  const animateTo = (toValue: number) =>
+    Animated.spring(scale, {
+      toValue,
+      speed: 40,
+      bounciness: 6,
+      useNativeDriver: true,
+    }).start();
 
   return (
     <TouchableOpacity
       disabled={disabled || loading}
       onPress={onPress}
-      activeOpacity={0.85}
-      style={[
-        styles.button,
-        {backgroundColor: bg, opacity: disabled ? 0.5 : 1},
-        style,
-      ]}>
-      {loading ? (
-        <ActivityIndicator color={textColor} size="small" />
-      ) : (
-        <Text style={[styles.label, {color: textColor}]}>{label}</Text>
-      )}
+      onPressIn={() => animateTo(0.97)}
+      onPressOut={() => animateTo(1)}
+      activeOpacity={0.9}>
+      <Animated.View
+        style={[
+          styles.button,
+          variant === 'primary' && elevation.level1,
+          {backgroundColor: bg, opacity: disabled ? 0.5 : 1, transform: [{scale}]},
+          style,
+        ]}>
+        {loading ? (
+          <ActivityIndicator color={textColor} size="small" />
+        ) : (
+          <Text style={[styles.label, {color: textColor}]}>{label}</Text>
+        )}
+      </Animated.View>
     </TouchableOpacity>
   );
 }

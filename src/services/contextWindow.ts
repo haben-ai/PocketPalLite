@@ -31,7 +31,29 @@ const PROMPT_OVERHEAD_TOKENS = 64;
  */
 const CHARS_PER_TOKEN_ESTIMATE = 4;
 
-function estimateTokens(text: string): number {
+/**
+ * Flat per-image token-cost estimate for vision models. Real vision-token
+ * cost varies by model and image resolution (typically hundreds to a couple
+ * thousand tokens once encoded) and isn't knowable without the model itself
+ * -- this is a deliberately conservative placeholder, same spirit as the
+ * char-based text estimate above, biased toward trimming text history more
+ * aggressively rather than risking a context overflow from an attached image.
+ */
+const IMAGE_TOKEN_ESTIMATE = 700;
+
+function estimateMessageTokens(msg: ChatMessage): number {
+  const textTokens = Math.ceil(msg.content.length / CHARS_PER_TOKEN_ESTIMATE);
+  const imageTokens = msg.imagePath ? IMAGE_TOKEN_ESTIMATE : 0;
+  return textTokens + imageTokens;
+}
+
+/**
+ * Exposed so callers can size a fixed prefix (e.g. the persona system
+ * prompt in ChatScreen.tsx) against the same heuristic used for history,
+ * and pass it in as `reservedTokens` below rather than it silently eating
+ * into the truncation budget unaccounted for.
+ */
+export function estimateTextTokens(text: string): number {
   return Math.ceil(text.length / CHARS_PER_TOKEN_ESTIMATE);
 }
 
@@ -45,6 +67,7 @@ function estimateTokens(text: string): number {
 export function truncateMessagesToContext(
   messages: ChatMessage[],
   contextSize: number = DEFAULT_CONTEXT_SIZE,
+  reservedTokens = 0,
 ): ChatMessage[] {
   if (messages.length === 0) {
     return [];
@@ -52,7 +75,7 @@ export function truncateMessagesToContext(
 
   const budget = Math.max(
     0,
-    contextSize - RESPONSE_TOKEN_RESERVE - PROMPT_OVERHEAD_TOKENS,
+    contextSize - RESPONSE_TOKEN_RESERVE - PROMPT_OVERHEAD_TOKENS - reservedTokens,
   );
 
   const result: ChatMessage[] = [];
@@ -60,7 +83,7 @@ export function truncateMessagesToContext(
 
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
-    const cost = estimateTokens(msg.content);
+    const cost = estimateMessageTokens(msg);
 
     if (result.length === 0) {
       // Always keep at least the newest message, even if it alone exceeds

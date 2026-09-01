@@ -1,13 +1,18 @@
 import {describe, it, expect} from '@jest/globals';
-import {truncateMessagesToContext, DEFAULT_CONTEXT_SIZE} from './contextWindow';
+import {
+  truncateMessagesToContext,
+  estimateTextTokens,
+  DEFAULT_CONTEXT_SIZE,
+} from './contextWindow';
 import {ChatMessage} from '../types';
 
 function makeMessage(
   id: string,
   content: string,
   role: 'user' | 'assistant' = 'user',
+  imagePath?: string,
 ): ChatMessage {
-  return {id, role, content, createdAt: Date.now()};
+  return {id, role, content, createdAt: Date.now(), imagePath};
 }
 
 describe('truncateMessagesToContext', () => {
@@ -96,6 +101,56 @@ describe('truncateMessagesToContext', () => {
     // Budget excludes the response reserve (512) and prompt overhead (64).
     const expectedBudget = contextSize - 512 - 64;
     expect(estimatedTokens).toBeLessThanOrEqual(expectedBudget);
+  });
+
+  it('counts an attached image against the budget, trimming more text history to fit', () => {
+    const filler = 'word '.repeat(80); // ~400 chars, ~100 estimated tokens each
+    const messages: ChatMessage[] = [];
+    for (let i = 0; i < 20; i++) {
+      messages.push(makeMessage(`msg-${i}`, filler));
+    }
+    // Newest message has an attached image, costing extra budget.
+    const withImage = [
+      ...messages,
+      makeMessage('with-image', 'What is in this photo?', 'user', '/tmp/photo.jpg'),
+    ];
+    const withoutImage = [
+      ...messages,
+      makeMessage('no-image', 'What is in this photo?', 'user'),
+    ];
+
+    const resultWithImage = truncateMessagesToContext(withImage, DEFAULT_CONTEXT_SIZE);
+    const resultWithoutImage = truncateMessagesToContext(
+      withoutImage,
+      DEFAULT_CONTEXT_SIZE,
+    );
+
+    // The image-bearing newest message must still be included...
+    expect(resultWithImage[resultWithImage.length - 1].id).toBe('with-image');
+    // ...but its extra token cost should leave less room for older history,
+    // so fewer older messages get kept than in the no-image case.
+    expect(resultWithImage.length).toBeLessThanOrEqual(resultWithoutImage.length);
+  });
+
+  it('reserves budget for a fixed prefix (e.g. a persona system prompt), trimming more history to compensate', () => {
+    const filler = 'word '.repeat(80); // ~400 chars, ~100 estimated tokens each
+    const messages: ChatMessage[] = [];
+    for (let i = 0; i < 20; i++) {
+      messages.push(makeMessage(`msg-${i}`, filler));
+    }
+    const systemPrompt =
+      'You are Riya, an AI assistant created by MustaAI. '.repeat(3);
+    const reservedTokens = estimateTextTokens(systemPrompt);
+
+    const withoutReserve = truncateMessagesToContext(messages, DEFAULT_CONTEXT_SIZE);
+    const withReserve = truncateMessagesToContext(
+      messages,
+      DEFAULT_CONTEXT_SIZE,
+      reservedTokens,
+    );
+
+    expect(reservedTokens).toBeGreaterThan(0);
+    expect(withReserve.length).toBeLessThanOrEqual(withoutReserve.length);
   });
 
   it('does not mutate the input array or its messages', () => {

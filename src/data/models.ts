@@ -121,6 +121,92 @@ export const MODEL_CATALOG: ModelInfo[] = [
       'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
     minRamGB: 6,
   },
+  // Vision-language models. All from ggml-org (the llama.cpp maintainers),
+  // whose GGUF + mmproj pairs are the ones confirmed working with
+  // llama.cpp's own multimodal tooling. mmproj (vision projector) files
+  // stay at Q8_0/f16 even when the base model is quantized -- quantizing
+  // the vision encoder visibly degrades image understanding, so these are
+  // inherently larger than a same-size text model, not a mistake.
+  {
+    id: 'smolvlm-500m',
+    name: 'SmolVLM 500M Instruct',
+    tier: 'weak',
+    params: '500M',
+    quant: 'Q8_0',
+    sizeBytes: 436806912,
+    fileName: 'smolvlm-500m.gguf',
+    description:
+      'Smallest vision model available. Can describe images and answer simple visual questions on weaker phones.',
+    repoUrl: 'https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF',
+    downloadUrl:
+      'https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF/resolve/main/SmolVLM-500M-Instruct-Q8_0.gguf',
+    minRamGB: 3,
+    capability: 'vision',
+    mmprojUrl:
+      'https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-500M-Instruct-Q8_0.gguf',
+    mmprojFileName: 'smolvlm-500m-mmproj.gguf',
+    mmprojSizeBytes: 108783360,
+  },
+  {
+    id: 'smolvlm2-2.2b',
+    name: 'SmolVLM2 2.2B Instruct',
+    tier: 'medium',
+    params: '2.2B',
+    quant: 'Q4_K_M',
+    sizeBytes: 1112602656,
+    fileName: 'smolvlm2-2.2b.gguf',
+    description:
+      'Noticeably sharper image understanding than the 500M model, while still fitting mid-range phones.',
+    repoUrl: 'https://huggingface.co/ggml-org/SmolVLM2-2.2B-Instruct-GGUF',
+    downloadUrl:
+      'https://huggingface.co/ggml-org/SmolVLM2-2.2B-Instruct-GGUF/resolve/main/SmolVLM2-2.2B-Instruct-Q4_K_M.gguf',
+    minRamGB: 5,
+    capability: 'vision',
+    mmprojUrl:
+      'https://huggingface.co/ggml-org/SmolVLM2-2.2B-Instruct-GGUF/resolve/main/mmproj-SmolVLM2-2.2B-Instruct-Q8_0.gguf',
+    mmprojFileName: 'smolvlm2-2.2b-mmproj.gguf',
+    mmprojSizeBytes: 592523200,
+  },
+  {
+    id: 'qwen2.5-vl-3b',
+    name: 'Qwen2.5-VL 3B Instruct',
+    tier: 'strong',
+    params: '3B',
+    quant: 'Q4_K_M',
+    sizeBytes: 1929901056,
+    fileName: 'qwen2.5-vl-3b.gguf',
+    description:
+      "One of the best small vision models available. Reads text in images, describes scenes, and answers detailed visual questions.",
+    repoUrl: 'https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF',
+    downloadUrl:
+      'https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF/resolve/main/Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf',
+    minRamGB: 7,
+    capability: 'vision',
+    mmprojUrl:
+      'https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF/resolve/main/mmproj-Qwen2.5-VL-3B-Instruct-f16.gguf',
+    mmprojFileName: 'qwen2.5-vl-3b-mmproj.gguf',
+    mmprojSizeBytes: 1338428128,
+  },
+  {
+    id: 'qwen2.5-vl-7b',
+    name: 'Qwen2.5-VL 7B Instruct',
+    tier: 'strong',
+    params: '7B',
+    quant: 'Q4_K_M',
+    sizeBytes: 4683072032,
+    fileName: 'qwen2.5-vl-7b.gguf',
+    description:
+      'The highest-quality vision model in this catalog. For flagship phones with RAM and storage to spare.',
+    repoUrl: 'https://huggingface.co/ggml-org/Qwen2.5-VL-7B-Instruct-GGUF',
+    downloadUrl:
+      'https://huggingface.co/ggml-org/Qwen2.5-VL-7B-Instruct-GGUF/resolve/main/Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf',
+    minRamGB: 10,
+    capability: 'vision',
+    mmprojUrl:
+      'https://huggingface.co/ggml-org/Qwen2.5-VL-7B-Instruct-GGUF/resolve/main/mmproj-Qwen2.5-VL-7B-Instruct-f16.gguf',
+    mmprojFileName: 'qwen2.5-vl-7b-mmproj.gguf',
+    mmprojSizeBytes: 1354162912,
+  },
 ];
 
 export const getModelById = (id: string): ModelInfo | undefined =>

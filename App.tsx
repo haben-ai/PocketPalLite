@@ -1,69 +1,46 @@
 import React, {useEffect, useState} from 'react';
-import {SafeAreaView, StyleSheet} from 'react-native';
-import {colors} from './src/theme';
+import {GestureHandlerRootView} from 'react-native-gesture-handler';
+import {NavigationContainer} from '@react-navigation/native';
 import {hasSeenOnboarding, setOnboardingSeen} from './src/storage/asyncStore';
 import {OnboardingScreen} from './src/screens/OnboardingScreen';
-import {ModelLibraryScreen} from './src/screens/ModelLibraryScreen';
-import {ConversationListScreen} from './src/screens/ConversationListScreen';
-import {ChatScreen} from './src/screens/ChatScreen';
+import {RootNavigator} from './src/navigation/RootNavigator';
+import {ensureBuiltInPersonaSeeded} from './src/storage/personas';
 
-type Route =
-  | {screen: 'loading'}
-  | {screen: 'onboarding'}
-  | {screen: 'library'}
-  | {screen: 'conversations'; modelId: string}
-  | {screen: 'chat'; modelId: string; conversationId: string};
+type Route = {screen: 'loading'} | {screen: 'onboarding'} | {screen: 'app'};
 
 export default function App() {
   const [route, setRoute] = useState<Route>({screen: 'loading'});
 
   useEffect(() => {
     (async () => {
+      // Runs for both new and upgrading users -- idempotent, ensures the
+      // built-in Riya/MustaAI persona always exists before Chat can need it.
+      await ensureBuiltInPersonaSeeded();
       const seen = await hasSeenOnboarding();
-      setRoute({screen: seen ? 'library' : 'onboarding'});
+      setRoute({screen: seen ? 'app' : 'onboarding'});
     })();
   }, []);
 
+  if (route.screen === 'loading') {
+    return null;
+  }
+
+  if (route.screen === 'onboarding') {
+    return (
+      <OnboardingScreen
+        onDone={async () => {
+          await setOnboardingSeen();
+          setRoute({screen: 'app'});
+        }}
+      />
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.root}>
-      {route.screen === 'onboarding' && (
-        <OnboardingScreen
-          onDone={async () => {
-            await setOnboardingSeen();
-            setRoute({screen: 'library'});
-          }}
-        />
-      )}
-
-      {route.screen === 'library' && (
-        <ModelLibraryScreen
-          onOpenModel={modelId => setRoute({screen: 'conversations', modelId})}
-        />
-      )}
-
-      {route.screen === 'conversations' && (
-        <ConversationListScreen
-          modelId={route.modelId}
-          onBack={() => setRoute({screen: 'library'})}
-          onOpenConversation={conversationId =>
-            setRoute({screen: 'chat', modelId: route.modelId, conversationId})
-          }
-        />
-      )}
-
-      {route.screen === 'chat' && (
-        <ChatScreen
-          modelId={route.modelId}
-          conversationId={route.conversationId}
-          onBack={() =>
-            setRoute({screen: 'conversations', modelId: route.modelId})
-          }
-        />
-      )}
-    </SafeAreaView>
+    <GestureHandlerRootView style={{flex: 1}}>
+      <NavigationContainer>
+        <RootNavigator />
+      </NavigationContainer>
+    </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {flex: 1, backgroundColor: colors.background},
-});

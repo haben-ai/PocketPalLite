@@ -1,8 +1,5 @@
 import {InferenceSession, Tensor} from 'onnxruntime-react-native';
-// @ts-ignore -- no bundled type declarations ship a default export signature
-// matching this exact constructor usage; the runtime API is confirmed via
-// node_modules/@huggingface/tokenizers/types/core/Tokenizer.d.ts.
-import Tokenizer from '@huggingface/tokenizers';
+import {Tokenizer} from '@huggingface/tokenizers';
 import RNFS from 'react-native-fs';
 import {DownloadedTranslationModel, LanguageCode} from '../types';
 
@@ -16,7 +13,7 @@ const MAX_NEW_TOKENS = 128;
 type Sessions = {
   encoder: InferenceSession;
   decoder: InferenceSession;
-  tokenizer: any;
+  tokenizer: Tokenizer;
 };
 
 let active: {modelId: string; sessions: Sessions} | null = null;
@@ -84,7 +81,7 @@ export async function describeSessions(
   };
 }
 
-function requireTokenId(tokenizer: any, token: string): number {
+function requireTokenId(tokenizer: Tokenizer, token: string): number {
   const id = tokenizer.token_to_id(token);
   if (id === undefined) {
     throw new Error(`Unknown token in NLLB vocabulary: "${token}"`);

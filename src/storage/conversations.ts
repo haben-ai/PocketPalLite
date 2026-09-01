@@ -1,5 +1,6 @@
 import {ChatMessage, Conversation} from '../types';
 import {getJSON, setJSON, removeKey, KEYS} from './asyncStore';
+import {BUILT_IN_PERSONA_ID} from '../data/persona';
 
 export async function getConversations(): Promise<Conversation[]> {
   const all = await getJSON<Conversation[]>(KEYS.conversations, []);
@@ -15,11 +16,13 @@ export async function getConversationsForModel(
 
 export async function createConversation(
   modelId: string,
+  personaId: string = BUILT_IN_PERSONA_ID,
 ): Promise<Conversation> {
   const all = await getJSON<Conversation[]>(KEYS.conversations, []);
   const conversation: Conversation = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     modelId,
+    personaId,
     title: 'New Chat',
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -37,6 +40,38 @@ export async function touchConversation(
     c.id === conversationId
       ? {...c, updatedAt: Date.now(), title: title ?? c.title}
       : c,
+  );
+  await setJSON(KEYS.conversations, next);
+}
+
+/**
+ * Switches which model a conversation continues with (the Gemini-style
+ * model switcher in ChatScreen). The full message history is already
+ * resent to whichever model is active on every turn, so this alone is
+ * enough to carry the visible conversation forward under the new model.
+ */
+export async function updateConversationModel(
+  conversationId: string,
+  modelId: string,
+): Promise<void> {
+  const all = await getJSON<Conversation[]>(KEYS.conversations, []);
+  const next = all.map(c =>
+    c.id === conversationId ? {...c, modelId, updatedAt: Date.now()} : c,
+  );
+  await setJSON(KEYS.conversations, next);
+}
+
+/**
+ * Switches which persona's system prompt a conversation continues with,
+ * mirroring updateConversationModel exactly.
+ */
+export async function updateConversationPersona(
+  conversationId: string,
+  personaId: string,
+): Promise<void> {
+  const all = await getJSON<Conversation[]>(KEYS.conversations, []);
+  const next = all.map(c =>
+    c.id === conversationId ? {...c, personaId, updatedAt: Date.now()} : c,
   );
   await setJSON(KEYS.conversations, next);
 }

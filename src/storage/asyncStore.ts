@@ -6,6 +6,8 @@ const KEYS = {
   downloadedModels: 'pocketpal:downloaded_models',
   conversationMessages: (conversationId: string) =>
     `pocketpal:conversation:${conversationId}`,
+  personas: 'pocketpal:personas',
+  appSettings: 'pocketpal:app_settings',
 };
 
 export {KEYS};

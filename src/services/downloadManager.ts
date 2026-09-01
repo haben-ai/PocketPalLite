@@ -15,13 +15,16 @@ export function modelFilePath(model: ModelInfo): string {
   return `${MODELS_DIR}/${model.fileName}`;
 }
 
+export function mmprojFilePath(model: ModelInfo): string | undefined {
+  return model.mmprojFileName ? `${MODELS_DIR}/${model.mmprojFileName}` : undefined;
+}
+
 export async function getFreeStorageBytes(): Promise<number> {
   const info = await RNFS.getFSInfo();
   return info.freeSpace;
 }
 
 export type DownloadHandle = {
-  jobId: number;
   cancel: () => void;
   completion: Promise<void>;
 };
@@ -60,7 +63,6 @@ export function downloadToFile(
   });
 
   return {
-    jobId,
     cancel: () => RNFS.stopDownload(jobId),
     completion,
   };
@@ -72,19 +74,62 @@ export async function downloadModel(
 ): Promise<DownloadHandle> {
   await ensureModelsDir();
 
+  const totalBytes = model.sizeBytes + (model.mmprojSizeBytes ?? 0);
   const freeSpace = await getFreeStorageBytes();
-  if (freeSpace < model.sizeBytes * 1.05) {
+  if (freeSpace < totalBytes * 1.05) {
     throw new Error(
-      `Not enough free storage. Need ~${(model.sizeBytes / 1e9).toFixed(
+      `Not enough free storage. Need ~${(totalBytes / 1e9).toFixed(
         1,
       )} GB, only ${(freeSpace / 1e9).toFixed(1)} GB free.`,
     );
   }
 
   const toFile = modelFilePath(model);
-  const handle = downloadToFile(model.downloadUrl, toFile, onProgress);
+  const mmprojTarget = mmprojFilePath(model);
 
-  const completion = handle.completion.then(async () => {
+  let cancelled = false;
+  let activeCancel: (() => void) | null = null;
+
+  const completion = (async () => {
+    // Base model file. When there's no mmproj, this is the whole download,
+    // so its progress maps 1:1 onto the reported fraction.
+    await new Promise<void>((resolve, reject) => {
+      const baseHandle = downloadToFile(model.downloadUrl, toFile, fraction => {
+        const baseShare = model.sizeBytes / totalBytes;
+        onProgress(fraction * baseShare, fraction * model.sizeBytes);
+      });
+      activeCancel = baseHandle.cancel;
+      baseHandle.completion.then(resolve, reject);
+    });
+    if (cancelled) {
+      throw new Error('Download cancelled');
+    }
+
+    // Vision models additionally need the mmproj (vision projector) file,
+    // downloaded second so the two files' progress can be aggregated into
+    // one bar rather than showing two separate downloads to the user.
+    if (mmprojTarget && model.mmprojUrl) {
+      await new Promise<void>((resolve, reject) => {
+        const mmprojHandle = downloadToFile(
+          model.mmprojUrl!,
+          mmprojTarget,
+          fraction => {
+            const baseShare = model.sizeBytes / totalBytes;
+            const mmprojShare = model.mmprojSizeBytes! / totalBytes;
+            onProgress(
+              baseShare + fraction * mmprojShare,
+              model.sizeBytes + fraction * model.mmprojSizeBytes!,
+            );
+          },
+        );
+        activeCancel = mmprojHandle.cancel;
+        mmprojHandle.completion.then(resolve, reject);
+      });
+      if (cancelled) {
+        throw new Error('Download cancelled');
+      }
+    }
+
     await registerDownloadedModel({
       modelId: model.id,
       filePath: toFile,
@@ -92,10 +137,17 @@ export async function downloadModel(
       downloadedAt: Date.now(),
       isCustomImport: false,
       displayName: model.name,
+      mmprojPath: mmprojTarget,
     });
-  });
+  })();
 
-  return {...handle, completion};
+  return {
+    cancel: () => {
+      cancelled = true;
+      activeCancel?.();
+    },
+    completion,
+  };
 }
 
 export async function deleteDownloadedModel(filePath: string): Promise<void> {

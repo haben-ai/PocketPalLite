@@ -1,7 +1,7 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {colors, radius} from '../theme';
-import {ModelTier} from '../types';
+import {ModelCapability, ModelTier} from '../types';
 
 const TIER_STYLES: Record<ModelTier, {fg: string; bg: string; label: string}> = {
   weak: {fg: colors.tierWeak, bg: colors.tierWeakBg, label: 'Weak'},
@@ -15,6 +15,41 @@ export function TierBadge({tier}: {tier: ModelTier}) {
     <View style={[styles.badge, {backgroundColor: style.bg}]}>
       <View style={[styles.dot, {backgroundColor: style.fg}]} />
       <Text style={[styles.label, {color: style.fg}]}>{style.label}</Text>
+    </View>
+  );
+}
+
+const CAPABILITY_STYLES: Record<
+  ModelCapability,
+  {fg: string; bg: string; label: string}
+> = {
+  text: {fg: colors.capabilityText, bg: colors.capabilityTextBg, label: 'Text'},
+  vision: {
+    fg: colors.capabilityVision,
+    bg: colors.capabilityVisionBg,
+    label: 'Vision',
+  },
+};
+
+/** Compact tag distinguishing text-only models from vision (image) models. */
+export function CapabilityBadge({
+  capability,
+  compact,
+}: {
+  capability: ModelCapability;
+  compact?: boolean;
+}) {
+  const style = CAPABILITY_STYLES[capability];
+  return (
+    <View
+      style={[
+        styles.badge,
+        compact && styles.badgeCompact,
+        {backgroundColor: style.bg},
+      ]}>
+      <Text style={[styles.label, compact && styles.labelCompact, {color: style.fg}]}>
+        {style.label}
+      </Text>
     </View>
   );
 }
@@ -39,6 +74,8 @@ const styles = StyleSheet.create({
   },
   dot: {width: 6, height: 6, borderRadius: 3},
   label: {fontSize: 12, fontWeight: '700'},
+  badgeCompact: {paddingHorizontal: 6, paddingVertical: 2},
+  labelCompact: {fontSize: 10},
   chip: {
     paddingHorizontal: 10,
     paddingVertical: 4,

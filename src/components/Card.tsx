@@ -1,6 +1,6 @@
 import React, {PropsWithChildren} from 'react';
 import {StyleSheet, View, ViewStyle} from 'react-native';
-import {colors, radius, spacing} from '../theme';
+import {colors, elevation, radius, spacing} from '../theme';
 
 export function Card({
   children,
@@ -21,14 +21,16 @@ export function Card({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceContainer,
     borderRadius: radius.lg,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.outlineVariant,
+    ...elevation.level1,
   },
   highlighted: {
     borderColor: colors.accent,
     borderWidth: 1.5,
+    ...elevation.level2,
   },
 });

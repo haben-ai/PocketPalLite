@@ -15,6 +15,8 @@ function makeFakeLlamaContext() {
         return {text: 'Hello'};
       },
     ),
+    initMultimodal: jest.fn(async (_params: {path: string; use_gpu?: boolean}) => true),
+    stopCompletion: jest.fn(async () => undefined),
     release: jest.fn(async () => undefined),
   };
 }
@@ -68,6 +70,15 @@ describe('adaptLlamaContext', () => {
     ).resolves.toEqual({text: 'Hello'});
   });
 
+  it('delegates stop() to the underlying context', async () => {
+    const raw = makeFakeLlamaContext();
+    const engine = adaptLlamaContext(raw);
+
+    await engine.stop();
+
+    expect(raw.stopCompletion).toHaveBeenCalledTimes(1);
+  });
+
   it('delegates release() to the underlying context', async () => {
     const raw = makeFakeLlamaContext();
     const engine = adaptLlamaContext(raw);
@@ -75,5 +86,32 @@ describe('adaptLlamaContext', () => {
     await engine.release();
 
     expect(raw.release).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards mediaPaths as media_paths for vision completions', async () => {
+    const raw = makeFakeLlamaContext();
+    const engine = adaptLlamaContext(raw);
+
+    await engine.completion({
+      messages: [{role: 'user', content: 'describe this'}],
+      n_predict: 64,
+      mediaPaths: ['/tmp/photo.jpg'],
+    });
+
+    const [forwardedParams] = raw.completion.mock.calls[0];
+    expect(forwardedParams).toMatchObject({media_paths: ['/tmp/photo.jpg']});
+  });
+
+  it('delegates initMultimodal() with path/use_gpu naming the raw context expects', async () => {
+    const raw = makeFakeLlamaContext();
+    const engine = adaptLlamaContext(raw);
+
+    const result = await engine.initMultimodal('/models/mmproj.gguf', true);
+
+    expect(raw.initMultimodal).toHaveBeenCalledWith({
+      path: '/models/mmproj.gguf',
+      use_gpu: true,
+    });
+    expect(result).toBe(true);
   });
 });

@@ -10,8 +10,14 @@ import App from '../App';
 import {it} from '@jest/globals';
 
 // Note: test renderer must be required after react-native.
-import renderer from 'react-test-renderer';
+import renderer, {act} from 'react-test-renderer';
 
-it('renders correctly', () => {
-  renderer.create(<App />);
+it('renders correctly', async () => {
+  // App's mount effect now awaits two sequential AsyncStorage round trips
+  // (persona seeding, then the onboarding-seen check) before its first
+  // setState -- this must be awaited inside act(), otherwise that setState
+  // lands after the test (and its renderer) has already torn down.
+  await act(async () => {
+    renderer.create(<App />);
+  });
 });
