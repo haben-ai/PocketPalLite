@@ -435,7 +435,10 @@ export function ChatScreen({
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={onOpenDrawer}
+          onPress={() => {
+            console.log('[DEBUG] hamburger pressed');
+            onOpenDrawer();
+          }}
           style={styles.iconButton}
           hitSlop={8}>
           <View style={styles.hamburgerLine} />

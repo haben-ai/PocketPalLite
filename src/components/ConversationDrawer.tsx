@@ -93,6 +93,7 @@ export function ConversationDrawer({
   }, []);
 
   useEffect(() => {
+    console.log('[DEBUG] drawer visible effect, visible=', visible);
     if (visible) {
       setMounted(true);
       setShowModelPicker(false);
