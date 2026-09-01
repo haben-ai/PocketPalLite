@@ -1,8 +1,7 @@
 import React, {useState} from 'react';
 import {SafeAreaView, StyleSheet, Text, View} from 'react-native';
-import {colors, gradients, spacing, typography} from '../theme';
+import {colors, spacing, typography} from '../theme';
 import {PrimaryButton} from '../components/PrimaryButton';
-import {Glow} from '../components/Glow';
 
 type Panel = {
   emoji: string;
@@ -37,7 +36,6 @@ export function OnboardingScreen({onDone}: {onDone: () => void}) {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.hero}>
-          <Glow size={260} />
           <Text style={styles.emoji}>{panel.emoji}</Text>
         </View>
         <Text style={styles.title}>{panel.title}</Text>
@@ -67,9 +65,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    // experimental_backgroundImage isn't in RN's bundled TS style types yet
-    // even though it's supported at runtime in this RN version -- see theme.ts.
-    ...({experimental_backgroundImage: gradients.hero} as object),
   },
   content: {
     flex: 1,
@@ -82,7 +77,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.lg,
   },
-  emoji: {fontSize: 64, position: 'absolute'},
+  emoji: {fontSize: 64},
   title: {...typography.title, textAlign: 'center', marginBottom: spacing.md},
   body: {
     ...typography.body,

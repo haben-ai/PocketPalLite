@@ -17,7 +17,7 @@ import {pick, isErrorWithCode, errorCodes} from '@react-native-documents/picker'
 // the file exists on disk. index.js (the plain "main" target) has the
 // identical PdfPageImage API and resolves cleanly as a direct file path.
 import PdfPageImage from '@dariyd/react-native-pdf-page-image/index';
-import {colors, gradients, spacing, typography} from '../theme';
+import {colors, spacing, typography} from '../theme';
 import {ChatMessage, DownloadedModel, Persona} from '../types';
 import {getModelById} from '../data/models';
 import {SYSTEM_PROMPT} from '../data/persona';
@@ -535,7 +535,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    ...({experimental_backgroundImage: gradients.hero} as object),
   },
   header: {
     flexDirection: 'row',

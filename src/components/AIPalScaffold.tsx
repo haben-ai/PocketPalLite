@@ -1,13 +1,11 @@
 import React from 'react';
 import {SafeAreaView, ScrollView, StyleSheet, View, ViewStyle} from 'react-native';
-import {colors, gradients, spacing} from '../theme';
+import {colors, spacing} from '../theme';
 
 /**
- * Shared screen-level chrome: safe area + the app's hero gradient background
- * + standard horizontal padding. Every tab screen previously inlined this
- * combination separately (ChatScreen/ModelLibraryScreen/OnboardingScreen
- * each had their own near-identical `styles.container`) -- this is the one
- * place it lives now.
+ * Shared screen-level chrome: safe area + flat background + standard
+ * horizontal padding. Every screen previously inlined this combination
+ * separately -- this is the one place it lives now.
  */
 export function AIPalScaffold({
   children,
@@ -38,7 +36,6 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.background,
-    ...({experimental_backgroundImage: gradients.hero} as object),
   },
   flex: {flex: 1},
   content: {

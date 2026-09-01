@@ -1,66 +1,53 @@
-// Purple/glow color story, matching the supplied "Chat AI" reference: a
-// deep purple-to-near-black backdrop with a vivid magenta-purple accent
-// used for glow effects, hero buttons, and the active/selected state.
+// ChatGPT-inspired monochrome dark theme: near-black flat backgrounds,
+// minimal color. Accent color is reserved for meaningful functional states
+// (model compatibility badges, errors) rather than brand decoration --
+// primary actions use a plain white-on-dark inversion (e.g. the send
+// button), matching ChatGPT's own restrained, colorless chrome.
 export const colors = {
-  background: '#0B0518',
-  // Tonal surface scale (elevation without literal drop shadows, same
-  // approach as before, recolored into the new purple family).
-  surfaceContainerLow: '#140A28',
-  surfaceContainer: '#1C1033',
-  surfaceContainerHigh: '#2A1846',
-  surfaceContainerHighest: '#35204F',
-  surface: '#1C1033',
-  surfaceRaised: '#2A1846',
+  background: '#212121',
+  sidebarBackground: '#171717',
 
-  outline: '#3A2856',
-  outlineVariant: '#2A1846',
-  border: '#3A2856',
+  // Tonal surface scale (elevation without literal drop shadows).
+  surfaceContainerLow: '#171717',
+  surfaceContainer: '#2A2A2A',
+  surfaceContainerHigh: '#2F2F2F',
+  surfaceContainerHighest: '#383838',
+  surface: '#2A2A2A',
+  surfaceRaised: '#2F2F2F',
 
-  textPrimary: '#F6F2FF',
-  textSecondary: '#B6A9D6',
-  textMuted: '#6E5E8F',
+  outline: '#3A3A3A',
+  outlineVariant: '#2D2D2D',
+  border: '#3A3A3A',
 
-  accent: '#B455FF',
-  accentMuted: '#B455FF26',
-  onAccent: '#FFFFFF',
+  textPrimary: '#ECECEC',
+  textSecondary: '#B4B4B4',
+  textMuted: '#8E8EA0',
 
-  userBubble: '#9A3EF2',
-  assistantBubble: '#2A1846',
+  // No brand color -- primary actions invert (white bg / near-black text)
+  // the same way ChatGPT's send button does.
+  accent: '#FFFFFF',
+  accentMuted: '#FFFFFF1F',
+  onAccent: '#111111',
+
+  // Assistant messages have no bubble at all (plain text on background),
+  // matching ChatGPT; only user messages get a subtle filled bubble.
+  userBubble: '#2F2F2F',
+  assistantBubble: 'transparent',
 
   success: '#3DD68C',
-  danger: '#FF5C7A',
+  danger: '#F65C5C',
 
-  tierWeak: '#5FB0E8',
-  tierWeakBg: '#5FB0E822',
-  tierMedium: '#F5B84F',
-  tierMediumBg: '#F5B84F22',
+  tierWeak: '#6FB3E8',
+  tierWeakBg: '#6FB3E822',
+  tierMedium: '#E8B84F',
+  tierMediumBg: '#E8B84F22',
   tierStrong: '#3DD68C',
   tierStrongBg: '#3DD68C22',
 
-  // Capability badges (Text/Vision) are a distinct hue family from tier
-  // badges so the two kinds of tag never get visually confused on a card.
-  capabilityText: '#B6A9D6',
-  capabilityTextBg: '#B6A9D61F',
+  capabilityText: '#B4B4B4',
+  capabilityTextBg: '#B4B4B41F',
   capabilityVision: '#4FD1C5',
   capabilityVisionBg: '#4FD1C522',
-
-  // Glow ring stops, brightest at the core, fading to transparent -- used
-  // with layered concentric circles to approximate a radial glow (RN's
-  // built-in gradient support, via experimental_backgroundImage, is
-  // linear-only).
-  glowCore: '#D68CFF',
-  glowMid: '#B455FF55',
-  glowOuter: '#B455FF00',
-};
-
-/**
- * CSS linear-gradient strings for the native `experimental_backgroundImage`
- * View style prop (confirmed present in this project's React Native 0.76.5
- * install -- no gradient library dependency needed).
- */
-export const gradients = {
-  hero: 'linear-gradient(180deg, #2B1450 0%, #150A2C 55%, #0B0518 100%)',
-  card: 'linear-gradient(160deg, #241238 0%, #180C2A 100%)',
 };
 
 export const spacing = {
@@ -73,40 +60,28 @@ export const spacing = {
 
 export const radius = {
   sm: 8,
-  md: 14,
-  lg: 20,
-  xl: 28,
+  md: 12,
+  lg: 16,
+  xl: 22,
   pill: 999,
 };
 
 export const typography = {
-  title: {fontSize: 26, fontWeight: '800' as const, color: colors.textPrimary},
-  heading: {fontSize: 18, fontWeight: '700' as const, color: colors.textPrimary},
+  title: {fontSize: 24, fontWeight: '700' as const, color: colors.textPrimary},
+  heading: {fontSize: 17, fontWeight: '600' as const, color: colors.textPrimary},
   body: {fontSize: 15, fontWeight: '400' as const, color: colors.textPrimary},
-  caption: {fontSize: 13, fontWeight: '500' as const, color: colors.textSecondary},
-  small: {fontSize: 11, fontWeight: '600' as const, color: colors.textMuted},
+  caption: {fontSize: 13, fontWeight: '400' as const, color: colors.textSecondary},
+  small: {fontSize: 11, fontWeight: '500' as const, color: colors.textMuted},
 };
 
 /**
- * Subtle, MD3-style elevation via shadow (Android renders these as a soft
- * drop shadow through elevation). Intentionally restrained -- one or two
- * steps, not a dramatic effect -- per "high quality, not extra flashy".
+ * Flat -- no elevation shadows or borders by default, matching ChatGPT's
+ * restrained, mostly-flat surfaces. Kept as a token (rather than deleted)
+ * so call sites don't need per-component conditionals.
  */
 export const elevation = {
-  level1: {
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 4,
-    shadowOffset: {width: 0, height: 1},
-  },
-  level2: {
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.24,
-    shadowRadius: 10,
-    shadowOffset: {width: 0, height: 3},
-  },
+  level1: {},
+  level2: {},
 };
 
 /** Standard durations for the Animated-based transitions across the app. */
