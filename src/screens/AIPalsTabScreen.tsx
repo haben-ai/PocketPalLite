@@ -1,10 +1,10 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {Alert, StyleSheet, Text} from 'react-native';
-import {useFocusEffect} from '@react-navigation/native';
 import {spacing, typography} from '../theme';
 import {Persona} from '../types';
 import {getPersonas, createPersona, updatePersona, deletePersona} from '../storage/personas';
 import {getDownloadedModels} from '../storage/modelRegistry';
+import {AppScreen} from '../navigation/types';
 import {AIPalScaffold} from '../components/AIPalScaffold';
 import {AIPalCard} from '../components/AIPalCard';
 import {PersonaEditorForm} from '../components/PersonaEditorForm';
@@ -14,7 +14,7 @@ import {DownloadedModel} from '../types';
 
 type SubView = {mode: 'list'} | {mode: 'edit'; personaId: string | null};
 
-export function AIPalsTabScreen() {
+export function AIPalsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen) => void}) {
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [downloadedModels, setDownloadedModels] = useState<DownloadedModel[]>([]);
   const [subView, setSubView] = useState<SubView>({mode: 'list'});
@@ -23,14 +23,11 @@ export function AIPalsTabScreen() {
     setPersonas(await getPersonas());
   }, []);
 
-  // Bottom-tab screens stay mounted across tab switches -- re-fetch every
-  // time this tab regains focus (e.g. ChatScreen's fallback seeding path
-  // adding the built-in persona after this screen was first visited).
-  useFocusEffect(
-    useCallback(() => {
-      refresh();
-    }, [refresh]),
-  );
+  // This screen fully mounts/unmounts on every sidebar navigation (no
+  // persistent tab bar), so a mount-only effect always shows fresh data.
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   useEffect(() => {
     if (subView.mode === 'edit') {
@@ -57,7 +54,7 @@ export function AIPalsTabScreen() {
       ? personas.find(p => p.id === subView.personaId)
       : undefined;
     return (
-      <AIPalScaffold scroll>
+      <AIPalScaffold scroll onBack={() => setSubView({mode: 'list'})}>
         <Text style={typography.title}>{editing ? 'Edit AIPal' : 'Create AIPal'}</Text>
         <PersonaEditorForm
           initial={editing}
@@ -78,7 +75,7 @@ export function AIPalsTabScreen() {
   }
 
   return (
-    <AIPalScaffold scroll>
+    <AIPalScaffold scroll onBack={() => onNavigate({name: 'chat'})}>
       <Text style={typography.title}>AIPals</Text>
       <Text style={styles.subtitle}>Distinct assistants with their own personality.</Text>
 

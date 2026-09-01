@@ -1,10 +1,8 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {Alert, StyleSheet, Text, TextInput, View} from 'react-native';
-import {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
-import {useFocusEffect} from '@react-navigation/native';
 import {pick, isErrorWithCode, errorCodes} from '@react-native-documents/picker';
 import {colors, spacing, typography} from '../theme';
-import {RootTabParamList} from '../navigation/types';
+import {AppScreen} from '../navigation/types';
 import {MODEL_CATALOG, TIER_LABEL, getModelById} from '../data/models';
 import {DeviceTier, DownloadedModel, ModelInfo, ModelTier} from '../types';
 import {
@@ -29,9 +27,12 @@ const TIERS: ModelTier[] = ['weak', 'medium', 'strong'];
 
 type DownloadState = {fraction: number; cancel: () => void} | undefined;
 
-type Props = BottomTabScreenProps<RootTabParamList, 'Models'>;
+type Props = {
+  highlightModelId?: string;
+  onNavigate: (screen: AppScreen) => void;
+};
 
-export function ModelsTabScreen({navigation, route}: Props) {
+export function ModelsTabScreen({highlightModelId, onNavigate}: Props) {
   const [downloaded, setDownloaded] = useState<DownloadedModel[]>([]);
   const [customModels, setCustomModels] = useState<DownloadedModel[]>([]);
   const [downloads, setDownloads] = useState<Record<string, DownloadState>>({});
@@ -62,23 +63,15 @@ export function ModelsTabScreen({navigation, route}: Props) {
       if (legacy) {
         await migrateLegacyModelIfPresent(legacy);
       }
+      await refresh();
       // Recommended-for-your-device is a standing section now, not a
-      // button the user has to think to tap -- runs once automatically
-      // (the device snapshot doesn't need to re-run every focus; a manual
-      // "Re-analyze" button covers the case where it goes stale).
+      // button the user has to think to tap -- runs once automatically.
       await handleAnalyze();
     })();
-  }, [handleAnalyze]);
-
-  // Bottom-tab screens stay mounted across tab switches, so a plain
-  // mount-only effect would go stale the moment a model is
-  // downloaded/deleted from elsewhere (e.g. Settings' storage list) --
-  // re-fetch every time this tab regains focus instead.
-  useFocusEffect(
-    useCallback(() => {
-      refresh();
-    }, [refresh]),
-  );
+    // This screen fully mounts/unmounts on every sidebar navigation (no
+    // persistent tab bar keeping it alive in the background any more), so
+    // a mount-only effect is enough to always show fresh data.
+  }, [refresh, handleAnalyze]);
 
   const isDownloaded = (modelId: string) => downloaded.some(m => m.modelId === modelId);
 
@@ -158,7 +151,7 @@ export function ModelsTabScreen({navigation, route}: Props) {
     }
   };
 
-  const openChat = (modelId: string) => navigation.navigate('Chat', {modelId});
+  const openChat = (modelId: string) => onNavigate({name: 'chat', modelId});
 
   const query = search.trim().toLowerCase();
   const matchesSearch = (model: ModelInfo) =>
@@ -172,10 +165,9 @@ export function ModelsTabScreen({navigation, route}: Props) {
     .filter(matchesSearch);
 
   const recommendedModel = device ? getModelById(device.recommendedModelId) : undefined;
-  const highlightModelId = route.params?.highlightModelId;
 
   return (
-    <AIPalScaffold scroll>
+    <AIPalScaffold scroll onBack={() => onNavigate({name: 'chat'})}>
       <Text style={typography.title}>Models</Text>
       <Text style={styles.subtitle}>Download a model to chat fully offline.</Text>
 

@@ -1,6 +1,5 @@
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {Alert, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
-import {useFocusEffect} from '@react-navigation/native';
 import {colors, radius, spacing, typography} from '../theme';
 import {AppSettings, getAppSettings, setAppSettings} from '../storage/appSettings';
 import {DownloadedModel} from '../types';
@@ -10,6 +9,7 @@ import {
 } from '../storage/modelRegistry';
 import {deleteDownloadedModel} from '../services/downloadManager';
 import {getModelById} from '../data/models';
+import {AppScreen} from '../navigation/types';
 import {AIPalScaffold} from '../components/AIPalScaffold';
 import {SettingRow} from '../components/SettingRow';
 import {PrimaryButton} from '../components/PrimaryButton';
@@ -51,7 +51,7 @@ function Stepper({
   );
 }
 
-export function SettingsTabScreen() {
+export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen) => void}) {
   const [subView, setSubView] = useState<SubView>('main');
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [downloaded, setDownloaded] = useState<DownloadedModel[]>([]);
@@ -61,14 +61,11 @@ export function SettingsTabScreen() {
     setDownloaded(await getDownloadedModels());
   }, []);
 
-  // Bottom-tab screens stay mounted across tab switches -- re-fetch every
-  // time this tab regains focus so a model downloaded/deleted elsewhere
-  // (e.g. the Models tab) doesn't leave this list stale.
-  useFocusEffect(
-    useCallback(() => {
-      refresh();
-    }, [refresh]),
-  );
+  // This screen fully mounts/unmounts on every sidebar navigation (no
+  // persistent tab bar), so a mount-only effect always shows fresh data.
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   const patch = async (p: Partial<AppSettings>) => {
     await setAppSettings(p);
@@ -103,7 +100,7 @@ export function SettingsTabScreen() {
 
   if (subView === 'advanced' && settings) {
     return (
-      <AIPalScaffold scroll>
+      <AIPalScaffold scroll onBack={() => setSubView('main')}>
         <Text style={typography.title}>Advanced</Text>
         <Text style={styles.subtitle}>
           Generation parameters. Most people never need to change these.
@@ -177,19 +174,12 @@ export function SettingsTabScreen() {
             }
           />
         </View>
-
-        <PrimaryButton
-          label="Back"
-          variant="secondary"
-          onPress={() => setSubView('main')}
-          style={styles.backButton}
-        />
       </AIPalScaffold>
     );
   }
 
   return (
-    <AIPalScaffold scroll>
+    <AIPalScaffold scroll onBack={() => onNavigate({name: 'chat'})}>
       <Text style={typography.title}>Settings</Text>
 
       <View style={styles.section}>
@@ -216,6 +206,17 @@ export function SettingsTabScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Models</Text>
+        <SettingRow
+          label="Manage models"
+          description="Download, delete, browse the catalog"
+          control={
+            <PrimaryButton
+              label="Open"
+              variant="secondary"
+              onPress={() => onNavigate({name: 'models'})}
+            />
+          }
+        />
         <SettingRow
           label="Generation parameters"
           description="Temperature, max tokens, context length"
@@ -267,7 +268,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   emptyHint: {...typography.caption},
-  backButton: {marginTop: spacing.sm, marginBottom: spacing.xl},
   stepper: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm},
   stepperButton: {
     width: 32,

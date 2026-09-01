@@ -1,6 +1,5 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
-import {RootTabParamList} from '../navigation/types';
+import {AppScreen} from '../navigation/types';
 import {AIPalScaffold} from '../components/AIPalScaffold';
 import {EmptyState} from '../components/EmptyState';
 import {ConversationDrawer} from '../components/ConversationDrawer';
@@ -10,7 +9,13 @@ import {getDownloadedModels} from '../storage/modelRegistry';
 import {getPersonas} from '../storage/personas';
 import {BUILT_IN_PERSONA_ID} from '../data/persona';
 
-type Props = BottomTabScreenProps<RootTabParamList, 'Chat'>;
+type Props = {
+  modelId?: string;
+  conversationId?: string;
+  personaId?: string;
+  prefillText?: string;
+  onNavigate: (screen: AppScreen) => void;
+};
 
 type ActiveConversation = {
   modelId: string;
@@ -20,51 +25,23 @@ type ActiveConversation = {
 };
 
 /**
- * Owns which conversation is showing, the conversation-history drawer, and
- * cross-tab deep-link handling (a model tapped in Models, a suggestion
- * tapped in Discover). ConversationDrawer itself is unmodified -- it's
- * simply re-parented here from the old App.tsx.
+ * Owns which conversation is showing and the conversation-history drawer.
+ * No more tab-focus/deep-link param dance -- this screen fully
+ * mounts/unmounts each time the user navigates to and from Chat via the
+ * sidebar, so a plain mount effect is all that's needed.
  */
-export function ChatTabScreen({navigation, route}: Props) {
+export function ChatTabScreen({
+  modelId,
+  conversationId,
+  personaId,
+  prefillText,
+  onNavigate,
+}: Props) {
   const [active, setActive] = useState<ActiveConversation | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [checkedInitial, setCheckedInitial] = useState(false);
 
-  // Chat-first boot: land on the most recent conversation, if any, the
-  // first time this tab mounts with no explicit params -- this used to be
-  // App.tsx's job before routing moved to the tab navigator.
   useEffect(() => {
-    if (checkedInitial) {
-      return;
-    }
     (async () => {
-      setCheckedInitial(true);
-      if (route.params?.modelId || route.params?.conversationId) {
-        return; // handled by the deep-link effect below
-      }
-      const conversations = await getConversations();
-      const mostRecent = conversations[0];
-      if (mostRecent) {
-        setActive({
-          modelId: mostRecent.modelId,
-          conversationId: mostRecent.id,
-          personaId: mostRecent.personaId ?? BUILT_IN_PERSONA_ID,
-        });
-      }
-    })();
-  }, [checkedInitial, route.params]);
-
-  // Cross-tab deep links: Models' "Use this model" / Discover's suggested
-  // task or recently-used AIPal navigate here with params instead of a
-  // conversationId. Consumed once, then cleared so re-focusing this tab
-  // later doesn't re-trigger.
-  useEffect(() => {
-    const {modelId, conversationId, personaId} = route.params ?? {};
-    if (!modelId && !conversationId) {
-      return;
-    }
-    (async () => {
-      const {prefillText} = route.params ?? {};
       if (conversationId && modelId) {
         setActive({
           modelId,
@@ -100,22 +77,24 @@ export function ChatTabScreen({navigation, route}: Props) {
             initialInput: prefillText,
           });
         }
-      } else if (prefillText) {
-        // prefillText with no model/persona specified isn't a supported
-        // deep-link shape yet (Discover's suggested tasks always pass a
-        // modelId too) -- nothing to do.
+      } else {
+        // Chat-first boot: land on the most recent conversation, if any.
+        const conversations = await getConversations();
+        const mostRecent = conversations[0];
+        if (mostRecent) {
+          setActive({
+            modelId: mostRecent.modelId,
+            conversationId: mostRecent.id,
+            personaId: mostRecent.personaId ?? BUILT_IN_PERSONA_ID,
+          });
+        }
       }
-      navigation.setParams({
-        modelId: undefined,
-        conversationId: undefined,
-        personaId: undefined,
-        prefillText: route.params?.prefillText,
-      });
     })();
-    // route.params is read fresh above via the closure each time this
-    // effect fires; only re-run when the specific fields that matter change.
+    // Intentionally only re-runs when the identity of the requested
+    // conversation/model/persona changes, not on every prop object identity
+    // change from the parent.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [route.params?.modelId, route.params?.conversationId, route.params?.personaId]);
+  }, [modelId, conversationId, personaId]);
 
   const handleOpenConversation = useCallback((modelId: string, conversationId: string) => {
     setDrawerOpen(false);
@@ -137,16 +116,13 @@ export function ChatTabScreen({navigation, route}: Props) {
           title="No conversations yet"
           body="Download a model to start chatting."
           actionLabel="Browse Models"
-          onAction={() => navigation.navigate('Models')}
+          onAction={() => onNavigate({name: 'models'})}
         />
         <ConversationDrawer
           visible={drawerOpen}
           onClose={() => setDrawerOpen(false)}
           onOpenConversation={handleOpenConversation}
-          onBrowseModels={() => {
-            setDrawerOpen(false);
-            navigation.navigate('Models');
-          }}
+          onNavigate={onNavigate}
         />
       </AIPalScaffold>
     );
@@ -166,10 +142,7 @@ export function ChatTabScreen({navigation, route}: Props) {
         visible={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onOpenConversation={handleOpenConversation}
-        onBrowseModels={() => {
-          setDrawerOpen(false);
-          navigation.navigate('Models');
-        }}
+        onNavigate={onNavigate}
       />
     </>
   );

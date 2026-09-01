@@ -1,9 +1,7 @@
-import React, {useCallback, useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
-import {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
-import {useFocusEffect} from '@react-navigation/native';
 import {colors, spacing, typography} from '../theme';
-import {RootTabParamList} from '../navigation/types';
+import {AppScreen} from '../navigation/types';
 import {SUGGESTED_TASKS, OFFLINE_CAPABILITY_CALLOUTS} from '../data/discoverContent';
 import {getConversations} from '../storage/conversations';
 import {getPersonas} from '../storage/personas';
@@ -16,48 +14,45 @@ import {AIPalCard} from '../components/AIPalCard';
 import {ModelCard} from '../components/ModelCard';
 import {Card} from '../components/Card';
 
-type Props = BottomTabScreenProps<RootTabParamList, 'Discover'>;
+type Props = {onNavigate: (screen: AppScreen) => void};
 
-export function DiscoverTabScreen({navigation}: Props) {
+export function DiscoverTabScreen({onNavigate}: Props) {
   const [recentPersonas, setRecentPersonas] = useState<Persona[]>([]);
   const [device, setDevice] = useState<DeviceTier | null>(null);
 
-  // Bottom-tab screens stay mounted across tab switches -- re-fetch every
-  // time this tab regains focus so "recently used" reflects conversations
-  // started after this screen was first visited.
-  useFocusEffect(
-    useCallback(() => {
-      (async () => {
-        const [conversations, personas] = await Promise.all([
-          getConversations(),
-          getPersonas(),
-        ]);
-        const seen = new Set<string>();
-        const ordered: Persona[] = [];
-        for (const conversation of conversations) {
-          const personaId = conversation.personaId;
-          if (!personaId || seen.has(personaId)) {
-            continue;
-          }
-          const persona = personas.find(p => p.id === personaId);
-          if (persona) {
-            seen.add(personaId);
-            ordered.push(persona);
-          }
-          if (ordered.length >= 3) {
-            break;
-          }
+  // This screen fully mounts/unmounts on every sidebar navigation (no
+  // persistent tab bar), so a mount-only effect always shows fresh data.
+  useEffect(() => {
+    (async () => {
+      const [conversations, personas] = await Promise.all([
+        getConversations(),
+        getPersonas(),
+      ]);
+      const seen = new Set<string>();
+      const ordered: Persona[] = [];
+      for (const conversation of conversations) {
+        const personaId = conversation.personaId;
+        if (!personaId || seen.has(personaId)) {
+          continue;
         }
-        setRecentPersonas(ordered);
-      })();
-      analyzeDevice().then(setDevice).catch(() => undefined);
-    }, []),
-  );
+        const persona = personas.find(p => p.id === personaId);
+        if (persona) {
+          seen.add(personaId);
+          ordered.push(persona);
+        }
+        if (ordered.length >= 3) {
+          break;
+        }
+      }
+      setRecentPersonas(ordered);
+    })();
+    analyzeDevice().then(setDevice).catch(() => undefined);
+  }, []);
 
   const recommendedModel = device ? getModelById(device.recommendedModelId) : undefined;
 
   return (
-    <AIPalScaffold scroll>
+    <AIPalScaffold scroll onBack={() => onNavigate({name: 'chat'})}>
       <Text style={typography.title}>Discover</Text>
       <Text style={styles.subtitle}>Ideas for what to try next.</Text>
 
@@ -70,9 +65,9 @@ export function DiscoverTabScreen({navigation}: Props) {
             onPress={() => {
               const modelId = recommendedModel?.id;
               if (modelId) {
-                navigation.navigate('Chat', {modelId, prefillText: task.prompt});
+                onNavigate({name: 'chat', modelId, prefillText: task.prompt});
               } else {
-                navigation.navigate('Models');
+                onNavigate({name: 'models'});
               }
             }}
           />
@@ -86,7 +81,7 @@ export function DiscoverTabScreen({navigation}: Props) {
             <AIPalCard
               key={persona.id}
               persona={persona}
-              onPress={() => navigation.navigate('Chat', {personaId: persona.id})}
+              onPress={() => onNavigate({name: 'chat', personaId: persona.id})}
             />
           ))}
         </View>
@@ -99,9 +94,9 @@ export function DiscoverTabScreen({navigation}: Props) {
             model={recommendedModel}
             device={device}
             onDownload={() =>
-              navigation.navigate('Models', {highlightModelId: recommendedModel.id})
+              onNavigate({name: 'models', highlightModelId: recommendedModel.id})
             }
-            onChat={() => navigation.navigate('Chat', {modelId: recommendedModel.id})}
+            onChat={() => onNavigate({name: 'chat', modelId: recommendedModel.id})}
             onDelete={() => undefined}
           />
         </View>

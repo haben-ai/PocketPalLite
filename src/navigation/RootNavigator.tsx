@@ -1,50 +1,44 @@
-import React from 'react';
-import {Text} from 'react-native';
-import {enableScreens} from 'react-native-screens';
-import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import {colors} from '../theme';
-import {RootTabParamList} from './types';
+import React, {useState} from 'react';
+import {AppScreen} from './types';
 import {ChatTabScreen} from '../screens/ChatTabScreen';
 import {ModelsTabScreen} from '../screens/ModelsTabScreen';
 import {AIPalsTabScreen} from '../screens/AIPalsTabScreen';
 import {DiscoverTabScreen} from '../screens/DiscoverTabScreen';
 import {SettingsTabScreen} from '../screens/SettingsTabScreen';
 
-enableScreens();
-
-const Tab = createBottomTabNavigator<RootTabParamList>();
-
-const TAB_ICONS: Record<keyof RootTabParamList, string> = {
-  Chat: '💬',
-  Models: '📦',
-  AIPals: '🎭',
-  Discover: '✨',
-  Settings: '⚙️',
-};
-
+/**
+ * ChatGPT-style shell: Chat is the sole default surface, reached directly
+ * on launch with no tab bar. Every other screen (Models/AIPals/Discover/
+ * Settings) is reached only via the hamburger sidebar and fully replaces
+ * the screen below it -- no persistent chrome, no bottom navigation.
+ */
 export function RootNavigator() {
-  return (
-    <Tab.Navigator
-      screenOptions={({route}) => ({
-        headerShown: false,
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: {
-          backgroundColor: colors.surfaceContainerLow,
-          borderTopColor: colors.outlineVariant,
-          borderTopWidth: 1,
-        },
-        tabBarIcon: ({color}) => (
-          <Text style={{fontSize: 20, color}}>
-            {TAB_ICONS[route.name as keyof RootTabParamList]}
-          </Text>
-        ),
-      })}>
-      <Tab.Screen name="Chat" component={ChatTabScreen} />
-      <Tab.Screen name="Models" component={ModelsTabScreen} />
-      <Tab.Screen name="AIPals" component={AIPalsTabScreen} />
-      <Tab.Screen name="Discover" component={DiscoverTabScreen} />
-      <Tab.Screen name="Settings" component={SettingsTabScreen} />
-    </Tab.Navigator>
-  );
+  const [screen, setScreen] = useState<AppScreen>({name: 'chat'});
+
+  switch (screen.name) {
+    case 'models':
+      return (
+        <ModelsTabScreen
+          highlightModelId={screen.highlightModelId}
+          onNavigate={setScreen}
+        />
+      );
+    case 'aipals':
+      return <AIPalsTabScreen onNavigate={setScreen} />;
+    case 'discover':
+      return <DiscoverTabScreen onNavigate={setScreen} />;
+    case 'settings':
+      return <SettingsTabScreen onNavigate={setScreen} />;
+    case 'chat':
+    default:
+      return (
+        <ChatTabScreen
+          modelId={screen.modelId}
+          conversationId={screen.conversationId}
+          personaId={screen.personaId}
+          prefillText={screen.prefillText}
+          onNavigate={setScreen}
+        />
+      );
+  }
 }
