@@ -9,7 +9,31 @@ export type EngineMessage = {
   content: string;
 };
 
-export type EngineCompletionParams = {
+/**
+ * Sampling parameters beyond n_predict/temperature -- every field here maps
+ * 1:1 to a real completion() param llama.rn's native binding supports
+ * (confirmed against node_modules/@pocketpalai/llama.rn/lib/typescript/
+ * NativeRNLlama.d.ts), so these have a genuine effect on generation, not
+ * just a UI reading.
+ */
+export type EngineSamplingParams = {
+  topK?: number;
+  topP?: number;
+  minP?: number;
+  xtcThreshold?: number;
+  xtcProbability?: number;
+  typicalP?: number;
+  penaltyLastN?: number;
+  penaltyRepeat?: number;
+  penaltyFreq?: number;
+  penaltyPresent?: number;
+  mirostat?: number;
+  seed?: number;
+  jinja?: boolean;
+  enableThinking?: boolean;
+};
+
+export type EngineCompletionParams = EngineSamplingParams & {
   messages: EngineMessage[];
   n_predict: number;
   stop?: string[];
@@ -49,6 +73,20 @@ type RawLlamaLikeContext = {
       stop?: string[];
       media_paths?: string[];
       temperature?: number;
+      top_k?: number;
+      top_p?: number;
+      min_p?: number;
+      xtc_threshold?: number;
+      xtc_probability?: number;
+      typical_p?: number;
+      penalty_last_n?: number;
+      penalty_repeat?: number;
+      penalty_freq?: number;
+      penalty_present?: number;
+      mirostat?: number;
+      seed?: number;
+      jinja?: boolean;
+      enable_thinking?: boolean;
     },
     callback?: (data: {token: string}) => void,
   ): Promise<{text: string}>;
@@ -69,6 +107,20 @@ export function adaptLlamaContext(raw: RawLlamaLikeContext): InferenceEngine {
             stop: params.stop,
             media_paths: params.mediaPaths,
             temperature: params.temperature,
+            top_k: params.topK,
+            top_p: params.topP,
+            min_p: params.minP,
+            xtc_threshold: params.xtcThreshold,
+            xtc_probability: params.xtcProbability,
+            typical_p: params.typicalP,
+            penalty_last_n: params.penaltyLastN,
+            penalty_repeat: params.penaltyRepeat,
+            penalty_freq: params.penaltyFreq,
+            penalty_present: params.penaltyPresent,
+            mirostat: params.mirostat,
+            seed: params.seed,
+            jinja: params.jinja,
+            enable_thinking: params.enableThinking,
           },
           onToken ? data => onToken(data.token) : undefined,
         )

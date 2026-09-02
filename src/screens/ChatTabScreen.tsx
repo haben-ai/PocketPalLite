@@ -108,6 +108,33 @@ export function ChatTabScreen({
     });
   }, []);
 
+  const handleNewChat = useCallback((newChatModelId: string, newChatPersonaId: string) => {
+    createConversation(newChatModelId, newChatPersonaId).then(conversation => {
+      setActive({
+        modelId: newChatModelId,
+        conversationId: conversation.id,
+        personaId: newChatPersonaId,
+      });
+    });
+  }, []);
+
+  // An imported conversation's model/persona come from whatever was in the
+  // export file, not from this screen's own state -- look them up fresh
+  // from storage rather than assuming they match the conversation we're
+  // currently on.
+  const handleConversationImported = useCallback((importedConversationId: string) => {
+    getConversations().then(all => {
+      const conversation = all.find(c => c.id === importedConversationId);
+      if (conversation) {
+        setActive({
+          modelId: conversation.modelId,
+          conversationId: conversation.id,
+          personaId: conversation.personaId ?? BUILT_IN_PERSONA_ID,
+        });
+      }
+    });
+  }, []);
+
   if (!active) {
     return (
       <AIPalScaffold>
@@ -137,6 +164,8 @@ export function ChatTabScreen({
         personaId={active.personaId}
         initialInput={active.initialInput}
         onOpenDrawer={() => setDrawerOpen(true)}
+        onNewChat={handleNewChat}
+        onConversationImported={handleConversationImported}
       />
       <ConversationDrawer
         visible={drawerOpen}

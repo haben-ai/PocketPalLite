@@ -22,13 +22,14 @@ import {
 import {getDownloadedModels} from '../storage/modelRegistry';
 import {CapabilityBadge} from './Badge';
 import {ModelPickerList} from './ModelPickerList';
+import {GridIcon, MaskIcon, SparkleIcon, GearIcon, PencilIcon} from './Icons';
 
 const DRAWER_WIDTH = Math.min(320, Dimensions.get('window').width * 0.84);
 
-const MENU_ITEMS: {icon: string; label: string; screen: AppScreen}[] = [
-  {icon: '📦', label: 'Models', screen: {name: 'models'}},
-  {icon: '🎭', label: 'AIPals', screen: {name: 'aipals'}},
-  {icon: '✨', label: 'Discover', screen: {name: 'discover'}},
+const MENU_ITEMS: {icon: React.ReactNode; label: string; screen: AppScreen}[] = [
+  {icon: <GridIcon />, label: 'Models', screen: {name: 'models'}},
+  {icon: <MaskIcon />, label: 'AIPals', screen: {name: 'aipals'}},
+  {icon: <SparkleIcon />, label: 'Discover', screen: {name: 'discover'}},
 ];
 
 function modelDisplayName(modelId: string, downloaded: DownloadedModel[]): string {
@@ -173,7 +174,7 @@ export function ConversationDrawer({
           <TouchableOpacity
             style={styles.menuRow}
             onPress={() => setShowModelPicker(true)}>
-            <Text style={styles.menuIcon}>✏️</Text>
+            <PencilIcon />
             <Text style={styles.menuLabel}>New chat</Text>
           </TouchableOpacity>
         )}
@@ -183,7 +184,7 @@ export function ConversationDrawer({
             key={item.label}
             style={styles.menuRow}
             onPress={() => navigateAndClose(item.screen)}>
-            <Text style={styles.menuIcon}>{item.icon}</Text>
+            {item.icon}
             <Text style={styles.menuLabel}>{item.label}</Text>
           </TouchableOpacity>
         ))}
@@ -225,7 +226,7 @@ export function ConversationDrawer({
         <TouchableOpacity
           style={styles.settingsRow}
           onPress={() => navigateAndClose({name: 'settings'})}>
-          <Text style={styles.menuIcon}>⚙️</Text>
+          <GearIcon />
           <Text style={styles.menuLabel}>Settings</Text>
         </TouchableOpacity>
       </Animated.View>
@@ -257,7 +258,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     borderRadius: radius.md,
   },
-  menuIcon: {fontSize: 18, width: 22, textAlign: 'center'},
   menuLabel: {...typography.body},
   pickerSection: {
     backgroundColor: colors.surfaceContainer,

@@ -23,7 +23,13 @@ import {getModelById} from '../data/models';
 import {SYSTEM_PROMPT} from '../data/persona';
 import {getDownloadedModel, getDownloadedModels} from '../storage/modelRegistry';
 import {getPersona, ensureBuiltInPersonaSeeded, getPersonas} from '../storage/personas';
-import {getAppSettings} from '../storage/appSettings';
+import {
+  AppSettings,
+  getAppSettings,
+  setAppSettings,
+  resetAppSettingsToDefaults,
+  resolveNPredict,
+} from '../storage/appSettings';
 import {
   getMessages,
   saveMessages,
@@ -31,6 +37,8 @@ import {
   updateConversationModel,
   updateConversationPersona,
   deriveTitle,
+  getConversation,
+  createConversation,
 } from '../storage/conversations';
 import {getInferenceEngine} from '../services/llamaSession';
 import {InferenceEngine} from '../services/inferenceEngine';
@@ -41,6 +49,11 @@ import {ChatBubble} from '../components/ChatBubble';
 import {ChatComposer} from '../components/ChatComposer';
 import {ModelSelector} from '../components/ModelSelector';
 import {PersonaSelector} from '../components/PersonaSelector';
+import {HeaderMenu} from '../components/HeaderMenu';
+import {PencilIcon, DotsIcon} from '../components/Icons';
+import {GenerationSettingsSheet} from '../components/GenerationSettingsSheet';
+import {ExportImportSheet} from '../components/ExportImportSheet';
+import {Conversation} from '../types';
 
 const STOP_WORDS = [
   '</s>',
@@ -64,6 +77,8 @@ export function ChatScreen({
   personaId,
   initialInput,
   onOpenDrawer,
+  onNewChat,
+  onConversationImported,
 }: {
   modelId: string;
   conversationId: string;
@@ -71,6 +86,10 @@ export function ChatScreen({
   /** Pre-fills the composer (unsent) -- used by Discover's suggested tasks. */
   initialInput?: string;
   onOpenDrawer: () => void;
+  /** Starts a fresh conversation with the given (live, current) model/persona. */
+  onNewChat: (modelId: string, personaId: string) => void;
+  /** Switches to a conversation that was just created by importing a file. */
+  onConversationImported: (conversationId: string) => void;
 }) {
   const [activeModelId, setActiveModelId] = useState(modelId);
   const [persona, setPersona] = useState<Persona | null>(null);
@@ -82,6 +101,11 @@ export function ChatScreen({
   const [ready, setReady] = useState(false);
   const [showModelSwitcher, setShowModelSwitcher] = useState(false);
   const [showPersonaSwitcher, setShowPersonaSwitcher] = useState(false);
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const [showGenerationSettings, setShowGenerationSettings] = useState(false);
+  const [showExportImport, setShowExportImport] = useState(false);
+  const [appSettings, setAppSettingsState] = useState<AppSettings | null>(null);
+  const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
   const [downloadedModels, setDownloadedModels] = useState<DownloadedModel[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -108,6 +132,16 @@ export function ChatScreen({
         setPersona(resolvedPersona);
       }
 
+      const conversation = await getConversation(conversationId);
+      if (!cancelled) {
+        setCurrentConversation(conversation ?? null);
+      }
+
+      const loadedSettings = await getAppSettings();
+      if (!cancelled) {
+        setAppSettingsState(loadedSettings);
+      }
+
       const downloaded = await getDownloadedModel(activeModelId);
       if (!downloaded) {
         setStatus('Model file not found. Go back and re-download it.');
@@ -116,7 +150,6 @@ export function ChatScreen({
 
       try {
         setReady(false);
-        const settings = await getAppSettings();
         const engine = await getInferenceEngine(
           activeModelId,
           downloaded.filePath,
@@ -126,7 +159,7 @@ export function ChatScreen({
               setStatus(`Loading model... ${progress}%`);
             }
           },
-          settings.contextSize,
+          loadedSettings.contextSize,
         );
         if (!cancelled) {
           engineRef.current = engine;
@@ -173,6 +206,24 @@ export function ChatScreen({
     if (next) {
       setPersona(next);
     }
+  };
+
+  const handleOpenGenerationSettings = async () => {
+    // Re-fetch so the sheet always opens with whatever was last saved
+    // (e.g. from a previous conversation's session), not this screen's
+    // possibly-stale mount-time snapshot.
+    setAppSettingsState(await getAppSettings());
+    setShowGenerationSettings(true);
+  };
+
+  const handleSaveGenerationSettings = async (next: AppSettings) => {
+    await setAppSettings(next);
+    setAppSettingsState(next);
+  };
+
+  const handleResetGenerationSettings = async () => {
+    const defaults = await resetAppSettingsToDefaults();
+    setAppSettingsState(defaults);
   };
 
   const handleAttachMedia = async () => {
@@ -264,8 +315,22 @@ export function ChatScreen({
       const result = await engine.completion(
         {
           messages: enginePayload,
-          n_predict: settings.maxTokens,
+          n_predict: resolveNPredict(settings),
           temperature: settings.temperature,
+          topK: settings.topK,
+          topP: settings.topP,
+          minP: settings.minP,
+          xtcThreshold: settings.xtcThreshold,
+          xtcProbability: settings.xtcProbability,
+          typicalP: settings.typicalP,
+          penaltyLastN: settings.penaltyLastN,
+          penaltyRepeat: settings.penaltyRepeat,
+          penaltyFreq: settings.penaltyFreq,
+          penaltyPresent: settings.penaltyPresent,
+          mirostat: settings.mirostat,
+          seed: settings.seed,
+          jinja: settings.jinja,
+          enableThinking: settings.includeThinkingInContext,
           stop: STOP_WORDS,
           mediaPaths: userMessage.imagePath ? [userMessage.imagePath] : undefined,
         },
@@ -462,7 +527,20 @@ export function ChatScreen({
             <Text style={styles.chevron}>▾</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.iconButton} />
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            onPress={() => onNewChat(activeModelId, persona?.id ?? personaId)}
+            style={styles.iconButton}
+            hitSlop={8}>
+            <PencilIcon />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setShowHeaderMenu(true)}
+            style={styles.iconButton}
+            hitSlop={8}>
+            <DotsIcon />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {status ? <Text style={styles.status}>{status}</Text> : null}
@@ -483,6 +561,31 @@ export function ChatScreen({
         personas={personas}
         activePersonaId={persona?.id}
         onSelect={handleSwitchPersona}
+      />
+
+      <HeaderMenu
+        visible={showHeaderMenu}
+        onClose={() => setShowHeaderMenu(false)}
+        onOpenGenerationSettings={handleOpenGenerationSettings}
+        onOpenModel={handleOpenModelSwitcher}
+        onOpenExportImport={() => setShowExportImport(true)}
+      />
+
+      {appSettings && (
+        <GenerationSettingsSheet
+          visible={showGenerationSettings}
+          settings={appSettings}
+          onClose={() => setShowGenerationSettings(false)}
+          onSave={handleSaveGenerationSettings}
+          onResetToDefaults={handleResetGenerationSettings}
+        />
+      )}
+
+      <ExportImportSheet
+        visible={showExportImport}
+        conversation={currentConversation}
+        onClose={() => setShowExportImport(false)}
+        onImported={onConversationImported}
       />
 
       <KeyboardAvoidingView
@@ -556,6 +659,7 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     backgroundColor: colors.textPrimary,
   },
+  headerActions: {flexDirection: 'row'},
   headerTitles: {flexShrink: 1, alignItems: 'center'},
   switcherRow: {
     flexDirection: 'row',

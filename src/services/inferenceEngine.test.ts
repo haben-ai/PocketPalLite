@@ -102,6 +102,51 @@ describe('adaptLlamaContext', () => {
     expect(forwardedParams).toMatchObject({media_paths: ['/tmp/photo.jpg']});
   });
 
+  it('forwards every sampling param to the raw context using llama.cpp\'s naming', async () => {
+    const raw = makeFakeLlamaContext();
+    const engine = adaptLlamaContext(raw);
+
+    await engine.completion({
+      messages: [{role: 'user', content: 'hi'}],
+      n_predict: -1,
+      temperature: 0.7,
+      topK: 40,
+      topP: 0.95,
+      minP: 0.05,
+      xtcThreshold: 0.1,
+      xtcProbability: 0,
+      typicalP: 1,
+      penaltyLastN: 64,
+      penaltyRepeat: 1,
+      penaltyFreq: 0,
+      penaltyPresent: 0,
+      mirostat: 2,
+      seed: 42,
+      jinja: true,
+      enableThinking: false,
+    });
+
+    const [forwardedParams] = raw.completion.mock.calls[0];
+    expect(forwardedParams).toMatchObject({
+      n_predict: -1,
+      temperature: 0.7,
+      top_k: 40,
+      top_p: 0.95,
+      min_p: 0.05,
+      xtc_threshold: 0.1,
+      xtc_probability: 0,
+      typical_p: 1,
+      penalty_last_n: 64,
+      penalty_repeat: 1,
+      penalty_freq: 0,
+      penalty_present: 0,
+      mirostat: 2,
+      seed: 42,
+      jinja: true,
+      enable_thinking: false,
+    });
+  });
+
   it('delegates initMultimodal() with path/use_gpu naming the raw context expects', async () => {
     const raw = makeFakeLlamaContext();
     const engine = adaptLlamaContext(raw);

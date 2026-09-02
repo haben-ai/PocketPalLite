@@ -7,6 +7,13 @@ export async function getConversations(): Promise<Conversation[]> {
   return all.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
+export async function getConversation(
+  conversationId: string,
+): Promise<Conversation | undefined> {
+  const all = await getJSON<Conversation[]>(KEYS.conversations, []);
+  return all.find(c => c.id === conversationId);
+}
+
 export async function getConversationsForModel(
   modelId: string,
 ): Promise<Conversation[]> {
