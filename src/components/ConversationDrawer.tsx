@@ -22,14 +22,21 @@ import {
 import {getDownloadedModels} from '../storage/modelRegistry';
 import {CapabilityBadge} from './Badge';
 import {ModelPickerList} from './ModelPickerList';
-import {GridIcon, MaskIcon, SparkleIcon, GearIcon, PencilIcon} from './Icons';
+import {
+  GlassGridIcon,
+  GlassMaskIcon,
+  GlassSparkleIcon,
+  GlassGearIcon,
+  GlassNewChatIcon,
+} from './GlassIcons';
 
 const DRAWER_WIDTH = Math.min(320, Dimensions.get('window').width * 0.84);
 
 const MENU_ITEMS: {icon: React.ReactNode; label: string; screen: AppScreen}[] = [
-  {icon: <GridIcon />, label: 'Models', screen: {name: 'models'}},
-  {icon: <MaskIcon />, label: 'AIPals', screen: {name: 'aipals'}},
-  {icon: <SparkleIcon />, label: 'Discover', screen: {name: 'discover'}},
+  {icon: <GlassGridIcon />, label: 'Models', screen: {name: 'models'}},
+  {icon: <GlassMaskIcon />, label: 'AIPals', screen: {name: 'aipals'}},
+  {icon: <GlassSparkleIcon />, label: 'Discover', screen: {name: 'discover'}},
+  {icon: <GlassGearIcon />, label: 'Settings', screen: {name: 'settings'}},
 ];
 
 function modelDisplayName(modelId: string, downloaded: DownloadedModel[]): string {
@@ -79,7 +86,6 @@ export function ConversationDrawer({
 }) {
   const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const [mounted, setMounted] = useState(visible);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [downloadedModels, setDownloadedModels] = useState<DownloadedModel[]>([]);
   const [showModelPicker, setShowModelPicker] = useState(false);
@@ -93,9 +99,13 @@ export function ConversationDrawer({
     setDownloadedModels(models);
   }, []);
 
+  // Stays mounted at all times (animated off-screen via translateX rather
+  // than unmounted) -- a previous mount/unmount state machine here had an
+  // intermittent bug where the drawer would occasionally never reappear
+  // after tapping the hamburger. Always-mounted + pointerEvents toggling is
+  // a simpler, more robust pattern for a component this size.
   useEffect(() => {
     if (visible) {
-      setMounted(true);
       setShowModelPicker(false);
       refresh();
     }
@@ -110,16 +120,8 @@ export function ConversationDrawer({
         duration: motion.base,
         useNativeDriver: true,
       }),
-    ]).start(() => {
-      if (!visible) {
-        setMounted(false);
-      }
-    });
+    ]).start();
   }, [visible, refresh, translateX, backdropOpacity]);
-
-  if (!mounted) {
-    return null;
-  }
 
   const handleStartNewChat = async (modelId: string) => {
     const conversation = await createConversation(modelId);
@@ -146,7 +148,9 @@ export function ConversationDrawer({
   };
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View
+      style={StyleSheet.absoluteFill}
+      pointerEvents={visible ? 'box-none' : 'none'}>
       <TouchableWithoutFeedback onPress={onClose}>
         <Animated.View
           style={[styles.backdrop, {opacity: backdropOpacity}]}
@@ -174,7 +178,7 @@ export function ConversationDrawer({
           <TouchableOpacity
             style={styles.menuRow}
             onPress={() => setShowModelPicker(true)}>
-            <PencilIcon />
+            <GlassNewChatIcon />
             <Text style={styles.menuLabel}>New chat</Text>
           </TouchableOpacity>
         )}
@@ -222,13 +226,6 @@ export function ConversationDrawer({
             );
           }}
         />
-
-        <TouchableOpacity
-          style={styles.settingsRow}
-          onPress={() => navigateAndClose({name: 'settings'})}>
-          <GearIcon />
-          <Text style={styles.menuLabel}>Settings</Text>
-        </TouchableOpacity>
       </Animated.View>
     </View>
   );
@@ -295,13 +292,4 @@ const styles = StyleSheet.create({
   rowModel: {...typography.small, flexShrink: 1},
   rowDate: {...typography.small},
   emptyHint: {...typography.caption, marginTop: spacing.sm, paddingHorizontal: spacing.sm},
-  settingsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.outlineVariant,
-  },
 });

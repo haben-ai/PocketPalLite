@@ -1,23 +1,35 @@
+import {Platform} from 'react-native';
+
+// iOS's system font is already SF Pro -- naming it explicitly here (rather
+// than leaving fontFamily unset) makes that intentional instead of
+// incidental. SF Pro itself is Apple-proprietary and its license restricts
+// bundling the font files outside Apple platforms, so Android intentionally
+// keeps its own native system font (Roboto) rather than trying to smuggle
+// SF Pro's files onto it.
+const systemFont = Platform.select({ios: 'System', default: undefined});
+
 // ChatGPT-inspired monochrome dark theme: near-black flat backgrounds,
 // minimal color. Accent color is reserved for meaningful functional states
 // (model compatibility badges, errors) rather than brand decoration --
 // primary actions use a plain white-on-dark inversion (e.g. the send
 // button), matching ChatGPT's own restrained, colorless chrome.
 export const colors = {
-  background: '#212121',
-  sidebarBackground: '#171717',
+  // True OLED black, not just a dark gray -- the surface tones below stay
+  // slightly lifted off it so cards/sheets still read as elevated.
+  background: '#000000',
+  sidebarBackground: '#000000',
 
   // Tonal surface scale (elevation without literal drop shadows).
-  surfaceContainerLow: '#171717',
-  surfaceContainer: '#2A2A2A',
-  surfaceContainerHigh: '#2F2F2F',
-  surfaceContainerHighest: '#383838',
-  surface: '#2A2A2A',
-  surfaceRaised: '#2F2F2F',
+  surfaceContainerLow: '#0D0D0D',
+  surfaceContainer: '#1A1A1A',
+  surfaceContainerHigh: '#232323',
+  surfaceContainerHighest: '#2E2E2E',
+  surface: '#1A1A1A',
+  surfaceRaised: '#232323',
 
-  outline: '#3A3A3A',
-  outlineVariant: '#2D2D2D',
-  border: '#3A3A3A',
+  outline: '#2E2E2E',
+  outlineVariant: '#1F1F1F',
+  border: '#2E2E2E',
 
   textPrimary: '#ECECEC',
   textSecondary: '#B4B4B4',
@@ -67,11 +79,11 @@ export const radius = {
 };
 
 export const typography = {
-  title: {fontSize: 24, fontWeight: '700' as const, color: colors.textPrimary},
-  heading: {fontSize: 17, fontWeight: '600' as const, color: colors.textPrimary},
-  body: {fontSize: 15, fontWeight: '400' as const, color: colors.textPrimary},
-  caption: {fontSize: 13, fontWeight: '400' as const, color: colors.textSecondary},
-  small: {fontSize: 11, fontWeight: '500' as const, color: colors.textMuted},
+  title: {fontSize: 24, fontWeight: '700' as const, color: colors.textPrimary, fontFamily: systemFont},
+  heading: {fontSize: 17, fontWeight: '600' as const, color: colors.textPrimary, fontFamily: systemFont},
+  body: {fontSize: 15, fontWeight: '400' as const, color: colors.textPrimary, fontFamily: systemFont},
+  caption: {fontSize: 13, fontWeight: '400' as const, color: colors.textSecondary, fontFamily: systemFont},
+  small: {fontSize: 11, fontWeight: '500' as const, color: colors.textMuted, fontFamily: systemFont},
 };
 
 /**

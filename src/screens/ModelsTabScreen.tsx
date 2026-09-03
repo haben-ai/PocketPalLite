@@ -17,7 +17,9 @@ import {
   registerDownloadedModel,
 } from '../storage/modelRegistry';
 import {analyzeDevice} from '../services/deviceAnalyzer';
+import {getAppSettings} from '../storage/appSettings';
 import {AIPalScaffold} from '../components/AIPalScaffold';
+import {AnalysisRevealCard} from '../components/AnalysisRevealCard';
 import {ModelCard} from '../components/ModelCard';
 import {Card} from '../components/Card';
 import {PrimaryButton} from '../components/PrimaryButton';
@@ -88,6 +90,13 @@ export function ModelsTabScreen({highlightModelId, onNavigate}: Props) {
         return next;
       });
       await refresh();
+      // "Auto-Navigate to Chat": fires once the file is actually ready and
+      // model *loading* (context init) is about to start -- navigating any
+      // earlier would land on Chat's "Model file not found" state.
+      const {autoNavigateToChat} = await getAppSettings();
+      if (autoNavigateToChat) {
+        openChat(model.id);
+      }
     } catch (err: any) {
       setDownloads(prev => {
         const next = {...prev};
@@ -184,21 +193,23 @@ export function ModelsTabScreen({highlightModelId, onNavigate}: Props) {
         {analyzing ? (
           <LoadingState label="Checking your phone..." />
         ) : recommendedModel ? (
-          <ModelCard
-            model={recommendedModel}
-            downloadedEntry={downloaded.find(m => m.modelId === recommendedModel.id)}
-            downloadState={downloads[recommendedModel.id]}
-            device={device ?? undefined}
-            highlighted
-            onDownload={() => handleDownload(recommendedModel)}
-            onChat={() => openChat(recommendedModel.id)}
-            onDelete={() => {
-              const entry = downloaded.find(m => m.modelId === recommendedModel.id);
-              if (entry) {
-                handleDelete(entry);
-              }
-            }}
-          />
+          <AnalysisRevealCard revealKey={recommendedModel.id}>
+            <ModelCard
+              model={recommendedModel}
+              downloadedEntry={downloaded.find(m => m.modelId === recommendedModel.id)}
+              downloadState={downloads[recommendedModel.id]}
+              device={device ?? undefined}
+              highlighted
+              onDownload={() => handleDownload(recommendedModel)}
+              onChat={() => openChat(recommendedModel.id)}
+              onDelete={() => {
+                const entry = downloaded.find(m => m.modelId === recommendedModel.id);
+                if (entry) {
+                  handleDelete(entry);
+                }
+              }}
+            />
+          </AnalysisRevealCard>
         ) : null}
         <PrimaryButton
           label="Re-analyze my phone"

@@ -4,6 +4,7 @@ import Clipboard from '@react-native-clipboard/clipboard';
 import {colors, radius, spacing, typography} from '../theme';
 import {ChatMessage} from '../types';
 import {TypingIndicator} from './TypingIndicator';
+import {GlassCopyIcon, GlassRegenerateIcon, GlassEditIcon} from './GlassIcons';
 
 export function ChatBubble({
   message,
@@ -51,18 +52,22 @@ export function ChatBubble({
           <View style={[styles.actions, {justifyContent: isUser ? 'flex-end' : 'flex-start'}]}>
             {!isUser && (
               <TouchableOpacity
+                style={styles.actionButton}
                 onPress={() => Clipboard.setString(message.content)}
                 hitSlop={6}>
+                <GlassCopyIcon />
                 <Text style={styles.actionLabel}>Copy</Text>
               </TouchableOpacity>
             )}
             {!isUser && onRegenerate && (
-              <TouchableOpacity onPress={onRegenerate} hitSlop={6}>
+              <TouchableOpacity style={styles.actionButton} onPress={onRegenerate} hitSlop={6}>
+                <GlassRegenerateIcon />
                 <Text style={styles.actionLabel}>Regenerate</Text>
               </TouchableOpacity>
             )}
             {isUser && onEdit && (
-              <TouchableOpacity onPress={onEdit} hitSlop={6}>
+              <TouchableOpacity style={styles.actionButton} onPress={onEdit} hitSlop={6}>
+                <GlassEditIcon />
                 <Text style={styles.actionLabel}>Edit</Text>
               </TouchableOpacity>
             )}
@@ -106,5 +111,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingHorizontal: 4,
   },
+  actionButton: {flexDirection: 'row', alignItems: 'center', gap: 4},
   actionLabel: {...typography.small, color: colors.textSecondary},
 });

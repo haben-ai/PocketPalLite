@@ -55,6 +55,52 @@ describe('appSettings', () => {
     expect(settings.jinja).toBe(APP_SETTINGS_DEFAULTS.jinja);
   });
 
+  it('defaults the new memory/model-loading settings to llama.cpp-safe values', async () => {
+    const settings = await getAppSettings();
+    expect(settings.useMlock).toBe(false);
+    expect(settings.useMmap).toBe(true);
+    expect(settings.autoNavigateToChat).toBe(false);
+    expect(settings.autoOffload).toBe(false);
+  });
+
+  it('round-trips useMlock/useMmap independently of other patches', async () => {
+    await setAppSettings({useMlock: true, useMmap: false});
+    const settings = await getAppSettings();
+    expect(settings.useMlock).toBe(true);
+    expect(settings.useMmap).toBe(false);
+    expect(settings.contextSize).toBe(APP_SETTINGS_DEFAULTS.contextSize);
+  });
+
+  it('defaults the new llama.cpp init params to their own documented defaults', async () => {
+    const settings = await getAppSettings();
+    expect(settings.nBatch).toBe(512);
+    expect(settings.nUbatch).toBe(512);
+    expect(settings.nThreads).toBe(4);
+    expect(settings.flashAttnType).toBe('auto');
+    expect(settings.cacheTypeK).toBe('f16');
+    expect(settings.cacheTypeV).toBe('f16');
+    expect(settings.themeMode).toBe('system');
+  });
+
+  it('round-trips the advanced init params and theme mode', async () => {
+    await setAppSettings({
+      nBatch: 256,
+      nThreads: 8,
+      flashAttnType: 'off',
+      cacheTypeK: 'q8_0',
+      themeMode: 'light',
+    });
+    const settings = await getAppSettings();
+    expect(settings.nBatch).toBe(256);
+    expect(settings.nThreads).toBe(8);
+    expect(settings.flashAttnType).toBe('off');
+    expect(settings.cacheTypeK).toBe('q8_0');
+    expect(settings.themeMode).toBe('light');
+    // Untouched fields stay at defaults.
+    expect(settings.nUbatch).toBe(APP_SETTINGS_DEFAULTS.nUbatch);
+    expect(settings.cacheTypeV).toBe(APP_SETTINGS_DEFAULTS.cacheTypeV);
+  });
+
   it('resetAppSettingsToDefaults clears any patch back to defaults', async () => {
     await setAppSettings({temperature: 1.5, topK: 10, jinja: false});
     const reset = await resetAppSettingsToDefaults();

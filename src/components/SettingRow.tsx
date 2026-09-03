@@ -7,20 +7,30 @@ export function SettingRow({
   label,
   description,
   control,
+  bare,
 }: {
   label: string;
   description?: string;
   control: React.ReactNode;
+  /** Skip the row's own Card/margin -- used when nested inside a
+   * SettingSection, which supplies one shared card for the whole group. */
+  bare?: boolean;
 }) {
-  return (
-    <Card style={styles.card}>
+  const content = (
+    <>
       <View style={styles.text}>
         <Text style={typography.body}>{label}</Text>
         {description ? <Text style={styles.description}>{description}</Text> : null}
       </View>
       {control}
-    </Card>
+    </>
   );
+
+  if (bare) {
+    return <View style={styles.bareRow}>{content}</View>;
+  }
+
+  return <Card style={styles.card}>{content}</Card>;
 }
 
 const styles = StyleSheet.create({
@@ -30,6 +40,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
     gap: spacing.sm,
+  },
+  bareRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
   },
   text: {flex: 1},
   description: {...typography.caption, color: colors.textSecondary, marginTop: 2},

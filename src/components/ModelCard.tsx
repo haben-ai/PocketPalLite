@@ -7,7 +7,7 @@ import {Card} from './Card';
 import {Chip} from './Badge';
 import {PrimaryButton} from './PrimaryButton';
 import {ModelCompatibilityBadge} from './ModelCompatibilityBadge';
-import {DownloadProgress} from './DownloadProgress';
+import {NeuralDownloadProgress} from './NeuralDownloadProgress';
 
 function formatSize(bytes: number): string {
   const gb = bytes / 1e9;
@@ -72,7 +72,7 @@ export function ModelCard({
       )}
 
       {downloadState ? (
-        <DownloadProgress fraction={downloadState.fraction} onCancel={downloadState.cancel} />
+        <NeuralDownloadProgress fraction={downloadState.fraction} onCancel={downloadState.cancel} />
       ) : downloadedEntry ? (
         <View style={styles.actionRow}>
           <PrimaryButton label="Use this model" onPress={onChat} style={styles.flexButton} />

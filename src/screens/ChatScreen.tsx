@@ -1,5 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
+  AppState,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -40,7 +41,7 @@ import {
   getConversation,
   createConversation,
 } from '../storage/conversations';
-import {getInferenceEngine} from '../services/llamaSession';
+import {getInferenceEngine, getActiveModelId} from '../services/llamaSession';
 import {InferenceEngine} from '../services/inferenceEngine';
 import {truncateMessagesToContext, estimateTextTokens} from '../services/contextWindow';
 import {getLanguagePipeline, DEFAULT_LANGUAGE} from '../services/languagePipeline';
@@ -50,8 +51,10 @@ import {ChatComposer} from '../components/ChatComposer';
 import {ModelSelector} from '../components/ModelSelector';
 import {PersonaSelector} from '../components/PersonaSelector';
 import {HeaderMenu} from '../components/HeaderMenu';
-import {PencilIcon, DotsIcon} from '../components/Icons';
+import {GlassIconButton} from '../components/Icons';
+import {GlassMenuIcon, GlassNewChatIcon, GlassDotsIcon} from '../components/GlassIcons';
 import {GenerationSettingsSheet} from '../components/GenerationSettingsSheet';
+import {DottedSpinner} from '../components/DottedSpinner';
 import {ExportImportSheet} from '../components/ExportImportSheet';
 import {Conversation} from '../types';
 
@@ -109,6 +112,10 @@ export function ChatScreen({
   const [downloadedModels, setDownloadedModels] = useState<DownloadedModel[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  // Bumped to re-run the engine-load effect below without changing model/
+  // conversation/persona identity -- used to reinit after Auto Offload
+  // released the context while the app was backgrounded.
+  const [reloadTick, setReloadTick] = useState(0);
   const engineRef = useRef<InferenceEngine | null>(null);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const streamingTextRef = useRef<string | null>(null);
@@ -159,7 +166,17 @@ export function ChatScreen({
               setStatus(`Loading model... ${progress}%`);
             }
           },
-          loadedSettings.contextSize,
+          {
+            contextSize: loadedSettings.contextSize,
+            useMlock: loadedSettings.useMlock,
+            useMmap: loadedSettings.useMmap,
+            nBatch: loadedSettings.nBatch,
+            nUbatch: loadedSettings.nUbatch,
+            nThreads: loadedSettings.nThreads,
+            flashAttnType: loadedSettings.flashAttnType,
+            cacheTypeK: loadedSettings.cacheTypeK,
+            cacheTypeV: loadedSettings.cacheTypeV,
+          },
         );
         if (!cancelled) {
           engineRef.current = engine;
@@ -175,7 +192,20 @@ export function ChatScreen({
     return () => {
       cancelled = true;
     };
-  }, [activeModelId, conversationId, personaId]);
+  }, [activeModelId, conversationId, personaId, reloadTick]);
+
+  // Auto Offload releases the active context on background; if that
+  // happened while this screen was already mounted, bump reloadTick on
+  // return to foreground so the effect above reinits it before the next
+  // send instead of failing against a released context.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active' && getActiveModelId() !== activeModelId) {
+        setReloadTick(t => t + 1);
+      }
+    });
+    return () => subscription.remove();
+  }, [activeModelId]);
 
   const handleOpenModelSwitcher = async () => {
     setDownloadedModels(await getDownloadedModels());
@@ -206,6 +236,13 @@ export function ChatScreen({
     if (next) {
       setPersona(next);
     }
+  };
+
+  const handleOpenHeaderMenu = async () => {
+    // Load fresh so the menu's inline Model submenu always reflects
+    // whatever's actually downloaded, not a possibly-stale mount snapshot.
+    setDownloadedModels(await getDownloadedModels());
+    setShowHeaderMenu(true);
   };
 
   const handleOpenGenerationSettings = async () => {
@@ -499,14 +536,9 @@ export function ChatScreen({
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={onOpenDrawer}
-          style={styles.iconButton}
-          hitSlop={8}>
-          <View style={styles.hamburgerLine} />
-          <View style={styles.hamburgerLine} />
-          <View style={[styles.hamburgerLine, {width: 14}]} />
-        </TouchableOpacity>
+        <GlassIconButton onPress={onOpenDrawer}>
+          <GlassMenuIcon />
+        </GlassIconButton>
         <View style={styles.headerTitles}>
           <TouchableOpacity
             onPress={handleOpenModelSwitcher}
@@ -526,20 +558,19 @@ export function ChatScreen({
             </Text>
             <Text style={styles.chevron}>▾</Text>
           </TouchableOpacity>
+          {!ready && (
+            <View style={styles.loadingDot}>
+              <DottedSpinner size={18} color={colors.textSecondary} />
+            </View>
+          )}
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            onPress={() => onNewChat(activeModelId, persona?.id ?? personaId)}
-            style={styles.iconButton}
-            hitSlop={8}>
-            <PencilIcon />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setShowHeaderMenu(true)}
-            style={styles.iconButton}
-            hitSlop={8}>
-            <DotsIcon />
-          </TouchableOpacity>
+          <GlassIconButton onPress={() => onNewChat(activeModelId, persona?.id ?? personaId)}>
+            <GlassNewChatIcon />
+          </GlassIconButton>
+          <GlassIconButton onPress={handleOpenHeaderMenu}>
+            <GlassDotsIcon />
+          </GlassIconButton>
         </View>
       </View>
 
@@ -567,8 +598,10 @@ export function ChatScreen({
         visible={showHeaderMenu}
         onClose={() => setShowHeaderMenu(false)}
         onOpenGenerationSettings={handleOpenGenerationSettings}
-        onOpenModel={handleOpenModelSwitcher}
         onOpenExportImport={() => setShowExportImport(true)}
+        models={downloadedModels}
+        activeModelId={activeModelId}
+        onSelectModel={handleSwitchModel}
       />
 
       {appSettings && (
@@ -643,24 +676,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
+    // Asymmetric on purpose: the hamburger sits close enough to the left
+    // edge with the plain spacing.md padding that on some devices (seen on
+    // a OnePlus/Realme ColorOS phone) the system's edge back-swipe gesture
+    // zone swallows taps on it before the app ever sees them. Extra left
+    // padding clears that zone; the right side isn't affected so it stays
+    // as-is.
+    paddingLeft: spacing.xl + spacing.md,
+    paddingRight: spacing.md,
     paddingVertical: spacing.sm,
   },
-  iconButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-  },
-  hamburgerLine: {
-    width: 18,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: colors.textPrimary,
-  },
-  headerActions: {flexDirection: 'row'},
+  headerActions: {flexDirection: 'row', gap: spacing.xs},
   headerTitles: {flexShrink: 1, alignItems: 'center'},
+  loadingDot: {marginTop: 4},
   switcherRow: {
     flexDirection: 'row',
     alignItems: 'center',

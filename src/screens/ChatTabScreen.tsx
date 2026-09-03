@@ -8,6 +8,7 @@ import {createConversation, getConversations} from '../storage/conversations';
 import {getDownloadedModels} from '../storage/modelRegistry';
 import {getPersonas} from '../storage/personas';
 import {BUILT_IN_PERSONA_ID} from '../data/persona';
+import {consumeIsColdStart} from '../services/appLifecycle';
 
 type Props = {
   modelId?: string;
@@ -78,10 +79,26 @@ export function ChatTabScreen({
           });
         }
       } else {
-        // Chat-first boot: land on the most recent conversation, if any.
+        // Chat-first boot: land on the most recent conversation, if any --
+        // but only when this app instance was already running (e.g. the
+        // user navigated back to Chat from the sidebar). If the process was
+        // actually killed and just cold-started, start a fresh conversation
+        // instead, carrying over whichever model/persona was last used
+        // rather than resuming the old chat's history.
         const conversations = await getConversations();
         const mostRecent = conversations[0];
-        if (mostRecent) {
+        const coldStart = consumeIsColdStart();
+        if (mostRecent && coldStart) {
+          const conversation = await createConversation(
+            mostRecent.modelId,
+            mostRecent.personaId ?? BUILT_IN_PERSONA_ID,
+          );
+          setActive({
+            modelId: mostRecent.modelId,
+            conversationId: conversation.id,
+            personaId: mostRecent.personaId ?? BUILT_IN_PERSONA_ID,
+          });
+        } else if (mostRecent) {
           setActive({
             modelId: mostRecent.modelId,
             conversationId: mostRecent.id,
