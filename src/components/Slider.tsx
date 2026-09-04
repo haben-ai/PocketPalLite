@@ -1,6 +1,6 @@
 import React, {useRef, useState} from 'react';
 import {PanResponder, StyleSheet, View} from 'react-native';
-import {colors} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 
 const THUMB_SIZE = 20;
 
@@ -97,15 +97,20 @@ export function Slider({
   ).current;
 
   const ratio = max > min ? clamp((value - min) / (max - min), 0, 1) : 0;
+  const {colors} = useTheme();
 
   return (
     <View style={styles.touchArea} {...panResponder.panHandlers}>
-      <View ref={trackRef} style={styles.track} onLayout={measureTrack}>
-        <View style={[styles.fill, {width: `${ratio * 100}%`}]} />
+      <View
+        ref={trackRef}
+        style={[styles.track, {backgroundColor: colors.surfaceContainerHigh}]}
+        onLayout={measureTrack}>
+        <View style={[styles.fill, {backgroundColor: colors.textPrimary, width: `${ratio * 100}%`}]} />
       </View>
       <View
         style={[
           styles.thumb,
+          {backgroundColor: colors.textPrimary},
           dragging && styles.thumbActive,
           {left: `${ratio * 100}%`},
         ]}
@@ -123,19 +128,16 @@ const styles = StyleSheet.create({
   track: {
     height: 3,
     borderRadius: 2,
-    backgroundColor: colors.surfaceContainerHigh,
   },
   fill: {
     height: 3,
     borderRadius: 2,
-    backgroundColor: colors.textPrimary,
   },
   thumb: {
     position: 'absolute',
     width: THUMB_SIZE,
     height: THUMB_SIZE,
     borderRadius: THUMB_SIZE / 2,
-    backgroundColor: colors.textPrimary,
     marginLeft: -THUMB_SIZE / 2,
     top: '50%',
     marginTop: -THUMB_SIZE / 2,

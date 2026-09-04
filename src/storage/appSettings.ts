@@ -55,6 +55,34 @@ export type AppSettings = {
   cacheTypeK: CacheType;
   /** Maps to llama.rn's cache_type_v init param. Same constraint as cacheTypeK. */
   cacheTypeV: CacheType;
+
+  /** Whether to attach the stored Hugging Face token as an Authorization
+   * header on model downloads (the token itself lives in secureStorage,
+   * not here -- this is just the on/off switch). */
+  useHfToken: boolean;
+  /** Read each assistant reply aloud via the device's TTS engine once it
+   * finishes streaming. */
+  ttsEnabled: boolean;
+  /** User has acknowledged the "searches leave your device" disclosure --
+   * gates the rest of the Internet Search section. */
+  searchDisclosureAccepted: boolean;
+  searchProvider: 'brave';
+  /** How many results to fetch per search -- higher uses more context. */
+  searchResultsCount: number;
+  /** UI language code (e.g. 'en', 'es', 'fr'); drives i18next. */
+  language: string;
+
+  /** Catalog model ids the user has hidden from the Models list via the
+   * per-row "X" on a not-yet-downloaded model. Purely a display filter --
+   * the model stays fully downloadable by search/import. Cleared by
+   * "Reset Models List" in the Models screen's filter menu. */
+  hiddenModelIds: string[];
+  /** Models screen list filter -- which rows are visible. */
+  modelsFilterMode: 'all' | 'downloaded' | 'available';
+  /** Models screen list ordering. */
+  modelsSortMode: 'recommended' | 'name' | 'size';
+  /** Models screen: split each section into Text / Vision groups. */
+  modelsGroupByType: boolean;
 };
 
 /** The exact set of values llama.rn's public ContextParams type accepts for
@@ -99,6 +127,16 @@ const DEFAULTS: AppSettings = {
   flashAttnType: 'auto',
   cacheTypeK: 'f16',
   cacheTypeV: 'f16',
+  useHfToken: false,
+  ttsEnabled: false,
+  searchDisclosureAccepted: false,
+  searchProvider: 'brave',
+  searchResultsCount: 5,
+  language: 'en',
+  hiddenModelIds: [],
+  modelsFilterMode: 'all',
+  modelsSortMode: 'recommended',
+  modelsGroupByType: false,
 };
 
 export {DEFAULTS as APP_SETTINGS_DEFAULTS};

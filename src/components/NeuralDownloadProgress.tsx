@@ -1,6 +1,7 @@
 import React, {useEffect, useRef} from 'react';
 import {Animated, StyleSheet, Text, View} from 'react-native';
-import {colors, spacing, typography} from '../theme';
+import {spacing} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 import {PrimaryButton} from './PrimaryButton';
 
 const NODE_COUNT = 6;
@@ -19,6 +20,7 @@ export function NeuralDownloadProgress({
   fraction: number;
   onCancel: () => void;
 }) {
+  const {colors, typography} = useTheme();
   const nodeAnims = useRef(
     Array.from({length: NODE_COUNT}, () => new Animated.Value(0)),
   ).current;
@@ -93,7 +95,7 @@ export function NeuralDownloadProgress({
           </React.Fragment>
         ))}
       </View>
-      <Text style={styles.label}>{Math.round(fraction * 100)}%</Text>
+      <Text style={[typography.small, styles.label]}>{Math.round(fraction * 100)}%</Text>
       <PrimaryButton
         label="Cancel"
         variant="secondary"
@@ -109,6 +111,6 @@ const styles = StyleSheet.create({
   chain: {flexDirection: 'row', alignItems: 'center', height: 16},
   node: {width: 10, height: 10, borderRadius: 5},
   line: {flex: 1, height: 2, marginHorizontal: 3, borderRadius: 1},
-  label: {...typography.small, textAlign: 'center'},
+  label: {textAlign: 'center'},
   button: {marginTop: 2},
 });

@@ -7,6 +7,7 @@ import {ensureBuiltInPersonaSeeded} from './src/storage/personas';
 import {getAppSettings} from './src/storage/appSettings';
 import {releaseActiveContext} from './src/services/llamaSession';
 import {ThemeProvider} from './src/theme/ThemeContext';
+import {initI18n} from './src/i18n';
 
 type Route = {screen: 'loading'} | {screen: 'onboarding'} | {screen: 'app'};
 
@@ -18,6 +19,8 @@ export default function App() {
       // Runs for both new and upgrading users -- idempotent, ensures the
       // built-in Riya/MustaAI persona always exists before Chat can need it.
       await ensureBuiltInPersonaSeeded();
+      const settings = await getAppSettings();
+      initI18n(settings.language);
       const seen = await hasSeenOnboarding();
       setRoute({screen: seen ? 'app' : 'onboarding'});
     })();

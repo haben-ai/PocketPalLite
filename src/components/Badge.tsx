@@ -1,15 +1,16 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
-import {colors, radius} from '../theme';
+import {radius} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 import {ModelCapability, ModelTier} from '../types';
 
-const TIER_STYLES: Record<ModelTier, {fg: string; bg: string; label: string}> = {
-  weak: {fg: colors.tierWeak, bg: colors.tierWeakBg, label: 'Weak'},
-  medium: {fg: colors.tierMedium, bg: colors.tierMediumBg, label: 'Medium'},
-  strong: {fg: colors.tierStrong, bg: colors.tierStrongBg, label: 'Strong'},
-};
-
 export function TierBadge({tier}: {tier: ModelTier}) {
+  const {colors} = useTheme();
+  const TIER_STYLES: Record<ModelTier, {fg: string; bg: string; label: string}> = {
+    weak: {fg: colors.tierWeak, bg: colors.tierWeakBg, label: 'Weak'},
+    medium: {fg: colors.tierMedium, bg: colors.tierMediumBg, label: 'Medium'},
+    strong: {fg: colors.tierStrong, bg: colors.tierStrongBg, label: 'Strong'},
+  };
   const style = TIER_STYLES[tier];
   return (
     <View style={[styles.badge, {backgroundColor: style.bg}]}>
@@ -19,18 +20,6 @@ export function TierBadge({tier}: {tier: ModelTier}) {
   );
 }
 
-const CAPABILITY_STYLES: Record<
-  ModelCapability,
-  {fg: string; bg: string; label: string}
-> = {
-  text: {fg: colors.capabilityText, bg: colors.capabilityTextBg, label: 'Text'},
-  vision: {
-    fg: colors.capabilityVision,
-    bg: colors.capabilityVisionBg,
-    label: 'Vision',
-  },
-};
-
 /** Compact tag distinguishing text-only models from vision (image) models. */
 export function CapabilityBadge({
   capability,
@@ -39,6 +28,11 @@ export function CapabilityBadge({
   capability: ModelCapability;
   compact?: boolean;
 }) {
+  const {colors} = useTheme();
+  const CAPABILITY_STYLES: Record<ModelCapability, {fg: string; bg: string; label: string}> = {
+    text: {fg: colors.capabilityText, bg: colors.capabilityTextBg, label: 'Text'},
+    vision: {fg: colors.capabilityVision, bg: colors.capabilityVisionBg, label: 'Vision'},
+  };
   const style = CAPABILITY_STYLES[capability];
   return (
     <View
@@ -55,9 +49,10 @@ export function CapabilityBadge({
 }
 
 export function Chip({label}: {label: string}) {
+  const {colors} = useTheme();
   return (
-    <View style={styles.chip}>
-      <Text style={styles.chipLabel}>{label}</Text>
+    <View style={[styles.chip, {backgroundColor: colors.surfaceRaised, borderColor: colors.border}]}>
+      <Text style={[styles.chipLabel, {color: colors.textSecondary}]}>{label}</Text>
     </View>
   );
 }
@@ -80,10 +75,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: radius.pill,
-    backgroundColor: colors.surfaceRaised,
     borderWidth: 1,
-    borderColor: colors.border,
     alignSelf: 'flex-start',
   },
-  chipLabel: {fontSize: 12, fontWeight: '600', color: colors.textSecondary},
+  chipLabel: {fontSize: 12, fontWeight: '600'},
 });

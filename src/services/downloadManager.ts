@@ -40,10 +40,12 @@ export function downloadToFile(
   url: string,
   toFile: string,
   onProgress: (fraction: number, bytesWritten: number) => void,
+  headers?: Record<string, string>,
 ): DownloadHandle {
   const {jobId, promise} = RNFS.downloadFile({
     fromUrl: url,
     toFile,
+    headers,
     progressDivider: 2,
     begin: () => {
       onProgress(0, 0);
@@ -55,12 +57,22 @@ export function downloadToFile(
     },
   });
 
-  const completion = promise.then(async result => {
-    if (result.statusCode && result.statusCode >= 400) {
+  const completion = promise.then(
+    async result => {
+      if (result.statusCode && result.statusCode >= 400) {
+        await RNFS.unlink(toFile).catch(() => undefined);
+        throw new Error(`Download failed with status ${result.statusCode}`);
+      }
+    },
+    async err => {
+      // A native/network/disk-full failure rejects the underlying promise
+      // directly (no statusCode to check, unlike the 4xx/5xx branch above)
+      // -- clean up any partial file the same way, then rethrow so callers
+      // still see the original failure.
       await RNFS.unlink(toFile).catch(() => undefined);
-      throw new Error(`Download failed with status ${result.statusCode}`);
-    }
-  });
+      throw err;
+    },
+  );
 
   return {
     cancel: () => RNFS.stopDownload(jobId),
@@ -71,6 +83,7 @@ export function downloadToFile(
 export async function downloadModel(
   model: ModelInfo,
   onProgress: (fraction: number, bytesWritten: number) => void,
+  headers?: Record<string, string>,
 ): Promise<DownloadHandle> {
   await ensureModelsDir();
 
@@ -94,10 +107,15 @@ export async function downloadModel(
     // Base model file. When there's no mmproj, this is the whole download,
     // so its progress maps 1:1 onto the reported fraction.
     await new Promise<void>((resolve, reject) => {
-      const baseHandle = downloadToFile(model.downloadUrl, toFile, fraction => {
-        const baseShare = model.sizeBytes / totalBytes;
-        onProgress(fraction * baseShare, fraction * model.sizeBytes);
-      });
+      const baseHandle = downloadToFile(
+        model.downloadUrl,
+        toFile,
+        fraction => {
+          const baseShare = model.sizeBytes / totalBytes;
+          onProgress(fraction * baseShare, fraction * model.sizeBytes);
+        },
+        headers,
+      );
       activeCancel = baseHandle.cancel;
       baseHandle.completion.then(resolve, reject);
     });
@@ -121,6 +139,7 @@ export async function downloadModel(
               model.sizeBytes + fraction * model.mmprojSizeBytes!,
             );
           },
+          headers,
         );
         activeCancel = mmprojHandle.cancel;
         mmprojHandle.completion.then(resolve, reject);
@@ -186,6 +205,51 @@ export async function migrateLegacyModelIfPresent(
   } else {
     await RNFS.unlink(legacyPath).catch(() => undefined);
   }
+}
+
+function sanitizeFileName(name: string): string {
+  const safe = name.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+  return (safe || 'model').slice(0, 60);
+}
+
+/**
+ * Downloads an arbitrary direct-download URL (a pasted "Add Remote Model"
+ * link, or a resolved Hugging Face file URL from the in-app HF search) and
+ * registers it exactly like a local import -- same models/ folder, same
+ * DownloadedModel registry entry, so it shows up in "Ready to Use" and
+ * loads through the normal chat path. No catalog entry is created; this is
+ * always isCustomImport: true. `modelId` is caller-generated (not derived
+ * here) so the caller can key its download-progress state before this
+ * promise resolves, matching how downloadModel()'s callers already key
+ * progress by the catalog model's own id.
+ */
+export async function downloadRemoteModel(
+  modelId: string,
+  url: string,
+  displayName: string,
+  onProgress: (fraction: number, bytesWritten: number) => void,
+  headers?: Record<string, string>,
+): Promise<DownloadHandle> {
+  await ensureModelsDir();
+
+  const toFile = `${MODELS_DIR}/${modelId}-${sanitizeFileName(displayName)}.gguf`;
+
+  const handle = downloadToFile(url, toFile, onProgress, headers);
+
+  const completion = handle.completion.then(async () => {
+    const stat = await RNFS.stat(toFile);
+    const sizeBytes = Number(stat.size);
+    await registerDownloadedModel({
+      modelId,
+      filePath: toFile,
+      sizeBytes,
+      downloadedAt: Date.now(),
+      isCustomImport: true,
+      displayName,
+    });
+  });
+
+  return {cancel: handle.cancel, completion};
 }
 
 export async function importLocalModel(

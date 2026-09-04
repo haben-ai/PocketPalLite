@@ -18,7 +18,8 @@ import {pick, isErrorWithCode, errorCodes} from '@react-native-documents/picker'
 // the file exists on disk. index.js (the plain "main" target) has the
 // identical PdfPageImage API and resolves cleanly as a direct file path.
 import PdfPageImage from '@dariyd/react-native-pdf-page-image/index';
-import {colors, spacing, typography} from '../theme';
+import {spacing} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 import {ChatMessage, DownloadedModel, Persona} from '../types';
 import {getModelById} from '../data/models';
 import {SYSTEM_PROMPT} from '../data/persona';
@@ -56,6 +57,9 @@ import {GlassMenuIcon, GlassNewChatIcon, GlassDotsIcon} from '../components/Glas
 import {GenerationSettingsSheet} from '../components/GenerationSettingsSheet';
 import {DottedSpinner} from '../components/DottedSpinner';
 import {ExportImportSheet} from '../components/ExportImportSheet';
+import {speak} from '../services/ttsService';
+import {BraveSearchProvider, formatSearchResultsForContext} from '../services/searchProvider';
+import {getSecret, SECRET_SERVICE} from '../services/secureStorage';
 import {Conversation} from '../types';
 
 const STOP_WORDS = [
@@ -116,6 +120,7 @@ export function ChatScreen({
   // conversation/persona identity -- used to reinit after Auto Offload
   // released the context while the app was backgrounded.
   const [reloadTick, setReloadTick] = useState(0);
+  const {colors, typography} = useTheme();
   const engineRef = useRef<InferenceEngine | null>(null);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const streamingTextRef = useRef<string | null>(null);
@@ -335,6 +340,32 @@ export function ChatScreen({
       const settings = await getAppSettings();
       const systemPrompt = persona?.systemPrompt ?? SYSTEM_PROMPT;
       const systemPromptTokens = estimateTextTokens(systemPrompt);
+
+      // Internet Search: one search per turn (not a multi-call agentic
+      // loop -- engine.completion() is a single one-shot call with no
+      // native tool-calling support to hook a loop into), only when this
+      // persona opts in AND the user has finished setup in Settings.
+      let searchContextMessage: {role: string; content: string} | null = null;
+      if (
+        persona?.internetSearchEnabled &&
+        settings.searchDisclosureAccepted &&
+        settings.searchProvider === 'brave'
+      ) {
+        const apiKey = await getSecret(SECRET_SERVICE.braveApiKey);
+        if (apiKey) {
+          try {
+            const provider = new BraveSearchProvider(apiKey);
+            const results = await provider.search(userMessage.content, settings.searchResultsCount);
+            searchContextMessage = {
+              role: 'system',
+              content: formatSearchResultsForContext(userMessage.content, results),
+            };
+          } catch {
+            // A failed search shouldn't block the reply -- just skip augmentation.
+          }
+        }
+      }
+
       const contextMessages = truncateMessagesToContext(
         nextMessages,
         settings.contextSize,
@@ -342,6 +373,7 @@ export function ChatScreen({
       );
       const enginePayload = [
         {role: 'system', content: systemPrompt},
+        ...(searchContextMessage ? [searchContextMessage] : []),
         ...contextMessages.map(m =>
           m.id === userMessage.id
             ? {role: m.role, content: llmInputText}
@@ -395,6 +427,11 @@ export function ChatScreen({
       setStreamingText(null);
       await saveMessages(conversationId, finalMessages);
       await touchConversation(conversationId);
+      // Speak the finished reply, not the growing partial text -- reading
+      // out a constantly-changing stream would be unusable.
+      if (settings.ttsEnabled) {
+        speak(assistantMessage.content);
+      }
     } catch (err: any) {
       setStreamingText(null);
       const partial = streamingTextRef.current;
@@ -534,7 +571,7 @@ export function ChatScreen({
       : messages;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
       <View style={styles.header}>
         <GlassIconButton onPress={onOpenDrawer}>
           <GlassMenuIcon />
@@ -547,16 +584,16 @@ export function ChatScreen({
             <Text style={typography.heading} numberOfLines={1}>
               {modelName}
             </Text>
-            <Text style={styles.chevron}>▾</Text>
+            <Text style={[styles.chevron, {color: colors.textSecondary}]}>▾</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleOpenPersonaSwitcher}
             style={styles.switcherRow}
             hitSlop={4}>
-            <Text style={styles.personaLabel} numberOfLines={1}>
+            <Text style={[typography.caption, {color: colors.textSecondary}]} numberOfLines={1}>
               {persona ? `${persona.avatarEmoji} ${persona.name}` : 'AIPal'}
             </Text>
-            <Text style={styles.chevron}>▾</Text>
+            <Text style={[styles.chevron, {color: colors.textSecondary}]}>▾</Text>
           </TouchableOpacity>
           {!ready && (
             <View style={styles.loadingDot}>
@@ -574,7 +611,7 @@ export function ChatScreen({
         </View>
       </View>
 
-      {status ? <Text style={styles.status}>{status}</Text> : null}
+      {status ? <Text style={[typography.caption, styles.status]}>{status}</Text> : null}
 
       <ModelSelector
         visible={showModelSwitcher}
@@ -670,7 +707,6 @@ export function ChatScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -695,10 +731,8 @@ const styles = StyleSheet.create({
     gap: 4,
     flexShrink: 1,
   },
-  personaLabel: {...typography.caption, color: colors.textSecondary},
-  chevron: {color: colors.textSecondary, fontSize: 14},
+  chevron: {fontSize: 14},
   status: {
-    ...typography.caption,
     textAlign: 'center',
     paddingVertical: spacing.xs,
   },

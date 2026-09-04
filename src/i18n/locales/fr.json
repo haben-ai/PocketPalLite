@@ -1,0 +1,57 @@
+{
+  "drawer": {
+    "newChat": "Nouvelle discussion",
+    "models": "Modèles",
+    "aipals": "AIPals",
+    "discover": "Découvrir",
+    "settings": "Paramètres",
+    "chats": "Discussions",
+    "noConversations": "Aucune conversation pour le moment."
+  },
+  "chat": {
+    "messagePlaceholder": "Message...",
+    "copy": "Copier",
+    "regenerate": "Régénérer",
+    "edit": "Modifier",
+    "editingMessage": "Modification du message",
+    "cancel": "Annuler"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "modelInitialization": "Paramètres d'initialisation du modèle",
+    "deviceSelection": "Sélection de l'appareil",
+    "deviceSelectionDescription": "CPU uniquement - Aucun accélérateur matériel détecté",
+    "contextSize": "Taille du contexte",
+    "advancedSettings": "Paramètres avancés",
+    "memorySettings": "Paramètres de mémoire",
+    "useMemoryLock": "Verrouillage mémoire",
+    "memoryMapping": "Mappage mémoire",
+    "modelLoadingSettings": "Paramètres de chargement du modèle",
+    "autoOffload": "Déchargement automatique",
+    "autoNavigate": "Accéder automatiquement au chat",
+    "appSettings": "Paramètres de l'application",
+    "theme": "Thème",
+    "themeLight": "Clair",
+    "themeDark": "Sombre",
+    "themeSystem": "Système",
+    "language": "Langue",
+    "textToSpeech": "Synthèse vocale",
+    "textToSpeechDescription": "Lire les réponses de l'assistant à voix haute.",
+    "internetSearch": "Recherche internet",
+    "apiSettings": "Paramètres API",
+    "huggingFaceToken": "Jeton Hugging Face",
+    "models": "Modèles",
+    "manageModels": "Gérer les modèles",
+    "storage": "Stockage",
+    "privacy": "Confidentialité",
+    "about": "À propos",
+    "version": "Version"
+  },
+  "common": {
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "save": "Enregistrer",
+    "open": "Ouvrir",
+    "back": "Retour"
+  }
+}

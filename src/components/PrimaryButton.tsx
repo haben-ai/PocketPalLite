@@ -7,7 +7,8 @@ import {
   TouchableOpacity,
   ViewStyle,
 } from 'react-native';
-import {colors, elevation, radius, spacing} from '../theme';
+import {elevation, radius, spacing} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 
 type Props = {
   label: string;
@@ -27,6 +28,7 @@ export function PrimaryButton({
   style,
 }: Props) {
   const scale = useRef(new Animated.Value(1)).current;
+  const {colors} = useTheme();
   const bg =
     variant === 'primary'
       ? colors.accent

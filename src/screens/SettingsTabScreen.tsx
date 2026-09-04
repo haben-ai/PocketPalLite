@@ -1,6 +1,10 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View} from 'react-native';
-import {colors, radius, spacing, typography} from '../theme';
+import {useTranslation} from 'react-i18next';
+import {radius, spacing} from '../theme';
+import {useTheme, useThemeContext} from '../theme/ThemeContext';
+import {SUPPORTED_LANGUAGES} from '../i18n';
+import {LanguagePicker} from '../components/LanguagePicker';
 import {AppSettings, CacheType, getAppSettings, setAppSettings} from '../storage/appSettings';
 import {DownloadedModel} from '../types';
 import {
@@ -15,7 +19,8 @@ import {SettingRow} from '../components/SettingRow';
 import {SettingSection} from '../components/SettingSection';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {Slider} from '../components/Slider';
-import {useThemeContext} from '../theme/ThemeContext';
+import {SecretInputModal} from '../components/SecretInputModal';
+import {getSecret, setSecret, SECRET_SERVICE} from '../services/secureStorage';
 import {TranslationTestScreen} from './TranslationTestScreen';
 import packageJson from '../../package.json';
 
@@ -41,16 +46,19 @@ function SliderSetting({
   step: number;
   onChange: (v: number) => void;
 }) {
+  const {colors, typography} = useTheme();
   return (
     <View style={styles.bareBlock}>
       <Text style={typography.body}>{label}</Text>
-      {description ? <Text style={styles.cacheTypeDescription}>{description}</Text> : null}
+      {description ? (
+        <Text style={[typography.caption, {color: colors.textSecondary}, styles.rowDescription]}>{description}</Text>
+      ) : null}
       <View style={styles.sliderControl}>
         <View style={styles.sliderTrackWrap}>
           <Slider value={value} min={min} max={max} step={step} onValueChange={onChange} />
         </View>
-        <View style={styles.valueBox}>
-          <Text style={styles.valueBoxText}>{value}</Text>
+        <View style={[styles.valueBox, {borderColor: colors.border}]}>
+          <Text style={typography.body}>{value}</Text>
         </View>
       </View>
     </View>
@@ -70,21 +78,29 @@ function SegmentedSetting<T extends string>({
   value: T;
   onChange: (v: T) => void;
 }) {
+  const {colors, typography} = useTheme();
   return (
     <View style={styles.bareBlock}>
       <Text style={typography.body}>{label}</Text>
-      {description ? <Text style={styles.cacheTypeDescription}>{description}</Text> : null}
-      <View style={styles.segmentedControl}>
+      {description ? (
+        <Text style={[typography.caption, {color: colors.textSecondary}, styles.rowDescription]}>{description}</Text>
+      ) : null}
+      <View style={[styles.segmentedControl, {borderColor: colors.border}]}>
         {options.map((opt, i) => (
           <TouchableOpacity
             key={opt.value}
             style={[
               styles.segment,
-              value === opt.value && styles.segmentActive,
-              i > 0 && styles.segmentBorder,
+              value === opt.value && {backgroundColor: colors.surfaceContainerHigh},
+              i > 0 && [styles.segmentBorder, {borderLeftColor: colors.border}],
             ]}
             onPress={() => onChange(opt.value)}>
-            <Text style={[styles.segmentLabel, value === opt.value && styles.segmentLabelActive]}>
+            <Text
+              style={[
+                typography.body,
+                {color: colors.textSecondary},
+                value === opt.value && {color: colors.textPrimary, fontWeight: '700'},
+              ]}>
               {opt.label}
             </Text>
           </TouchableOpacity>
@@ -105,10 +121,11 @@ function CacheTypeSetting({
   onChange: (v: CacheType) => void;
   disabled: boolean;
 }) {
+  const {colors, typography} = useTheme();
   return (
     <View style={styles.bareBlock}>
       <Text style={typography.body}>{label}</Text>
-      <Text style={styles.cacheTypeDescription}>
+      <Text style={[typography.caption, {color: colors.textSecondary}, styles.rowDescription]}>
         {disabled ? 'Enable Flash Attention to change cache type' : 'llama.cpp KV cache quantization (experimental).'}
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.cacheTypeScroll}>
@@ -121,13 +138,15 @@ function CacheTypeSetting({
               <View
                 style={[
                   styles.contextPill,
-                  value === type && styles.contextPillActive,
+                  {backgroundColor: colors.surfaceContainerHigh},
+                  value === type && {backgroundColor: colors.accent},
                   disabled && styles.contextPillDisabled,
                 ]}>
                 <Text
                   style={[
                     styles.contextPillLabel,
-                    value === type && styles.contextPillLabelActive,
+                    {color: colors.textSecondary},
+                    value === type && {color: colors.onAccent},
                   ]}>
                   {type === 'f16' ? 'F16 (Default)' : type}
                 </Text>
@@ -153,18 +172,19 @@ function Stepper({
   max: number;
   onChange: (next: number) => void;
 }) {
+  const {colors, typography} = useTheme();
   return (
     <View style={styles.stepper}>
       <TouchableOpacity
         onPress={() => onChange(Math.max(min, value - step))}
-        style={styles.stepperButton}>
-        <Text style={styles.stepperLabel}>-</Text>
+        style={[styles.stepperButton, {backgroundColor: colors.surfaceContainerHigh}]}>
+        <Text style={[styles.stepperLabel, {color: colors.textPrimary}]}>-</Text>
       </TouchableOpacity>
-      <Text style={styles.stepperValue}>{value}</Text>
+      <Text style={[typography.body, styles.stepperValue]}>{value}</Text>
       <TouchableOpacity
         onPress={() => onChange(Math.min(max, value + step))}
-        style={styles.stepperButton}>
-        <Text style={styles.stepperLabel}>+</Text>
+        style={[styles.stepperButton, {backgroundColor: colors.surfaceContainerHigh}]}>
+        <Text style={[styles.stepperLabel, {color: colors.textPrimary}]}>+</Text>
       </TouchableOpacity>
     </View>
   );
@@ -175,11 +195,20 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [downloaded, setDownloaded] = useState<DownloadedModel[]>([]);
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
+  const [hfTokenSet, setHfTokenSet] = useState(false);
+  const [showHfTokenModal, setShowHfTokenModal] = useState(false);
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
+  const [braveKeySet, setBraveKeySet] = useState(false);
+  const [showBraveKeyModal, setShowBraveKeyModal] = useState(false);
   const {themeMode, setThemeMode: setThemeModeContext} = useThemeContext();
+  const {colors, typography} = useTheme();
+  const {t, i18n} = useTranslation();
 
   const refresh = useCallback(async () => {
     setSettings(await getAppSettings());
     setDownloaded(await getDownloadedModels());
+    setHfTokenSet((await getSecret(SECRET_SERVICE.hfToken)) !== null);
+    setBraveKeySet((await getSecret(SECRET_SERVICE.braveApiKey)) !== null);
   }, []);
 
   // This screen fully mounts/unmounts on every sidebar navigation (no
@@ -222,25 +251,25 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
   if (!settings) {
     return (
       <AIPalScaffold onBack={() => onNavigate({name: 'chat'})}>
-        <Text style={typography.title}>Settings</Text>
+        <Text style={typography.title}>{t('settings.title')}</Text>
       </AIPalScaffold>
     );
   }
 
   return (
     <AIPalScaffold scroll onBack={() => onNavigate({name: 'chat'})}>
-      <Text style={typography.title}>Settings</Text>
+      <Text style={typography.title}>{t('settings.title')}</Text>
 
-      <SettingSection title="Model Initialization Settings">
+      <SettingSection title={t('settings.modelInitialization')}>
         <SettingRow
           bare
-          label="Device Selection"
-          description="CPU only - No hardware accelerators detected"
+          label={t('settings.deviceSelection')}
+          description={t('settings.deviceSelectionDescription')}
           control={<View />}
         />
         <SettingRow
           bare
-          label="Context Size"
+          label={t('settings.contextSize')}
           description="Model reload needed for changes to take effect."
           control={
             <View style={styles.contextRow}>
@@ -249,12 +278,14 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
                   <View
                     style={[
                       styles.contextPill,
-                      settings.contextSize === size && styles.contextPillActive,
+                      {backgroundColor: colors.surfaceContainerHigh},
+                      settings.contextSize === size && {backgroundColor: colors.accent},
                     ]}>
                     <Text
                       style={[
                         styles.contextPillLabel,
-                        settings.contextSize === size && styles.contextPillLabelActive,
+                        {color: colors.textSecondary},
+                        settings.contextSize === size && {color: colors.onAccent},
                       ]}>
                       {size}
                     </Text>
@@ -266,10 +297,12 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
         />
         <SettingRow
           bare
-          label="Advanced Settings"
+          label={t('settings.advancedSettings')}
           control={
             <TouchableOpacity onPress={() => setAdvancedExpanded(v => !v)}>
-              <Text style={styles.chevron}>{advancedExpanded ? '⌄' : '›'}</Text>
+              <Text style={[styles.chevron, {color: colors.textMuted}]}>
+                {advancedExpanded ? '⌄' : '›'}
+              </Text>
             </TouchableOpacity>
           }
         />
@@ -357,10 +390,10 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
         )}
       </SettingSection>
 
-      <SettingSection title="Memory Settings">
+      <SettingSection title={t('settings.memorySettings')}>
         <SettingRow
           bare
-          label="Use Memory Lock"
+          label={t('settings.useMemoryLock')}
           description="Force system to keep model in RAM rather than swapping or compressing. Model reload needed for changes to take effect."
           control={
             <Switch
@@ -373,7 +406,7 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
         />
         <SettingRow
           bare
-          label="Memory Mapping"
+          label={t('settings.memoryMapping')}
           description="Use memory-mapped files for faster model loading. Model reload needed for changes to take effect."
           control={
             <Switch
@@ -386,10 +419,10 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
         />
       </SettingSection>
 
-      <SettingSection title="Model Loading Settings">
+      <SettingSection title={t('settings.modelLoadingSettings')}>
         <SettingRow
           bare
-          label="Auto Offload/Load"
+          label={t('settings.autoOffload')}
           description="Offload model when app is in background."
           control={
             <Switch
@@ -402,7 +435,7 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
         />
         <SettingRow
           bare
-          label="Auto-Navigate to Chat"
+          label={t('settings.autoNavigate')}
           description="Navigate to chat when a download finishes and the model is about to load."
           control={
             <Switch
@@ -415,24 +448,61 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
         />
       </SettingSection>
 
-      <SettingSection title="App Settings">
+      <SettingSection title={t('settings.appSettings')}>
+        <SettingRow
+          bare
+          label={t('settings.language')}
+          control={
+            <TouchableOpacity
+              style={[styles.languageChip, {borderColor: colors.border}]}
+              onPress={() => setShowLanguagePicker(true)}>
+              <Text style={typography.body}>
+                {SUPPORTED_LANGUAGES.find(l => l.code === settings.language)?.label ?? settings.language}
+              </Text>
+              <Text style={{color: colors.textMuted}}>⌄</Text>
+            </TouchableOpacity>
+          }
+        />
         <SegmentedSetting<'light' | 'dark' | 'system'>
-          label="Theme"
+          label={t('settings.theme')}
           description="System follows your phone's own light/dark setting."
           options={[
-            {value: 'light', label: 'Light'},
-            {value: 'dark', label: 'Dark'},
-            {value: 'system', label: 'System'},
+            {value: 'light', label: t('settings.themeLight')},
+            {value: 'dark', label: t('settings.themeDark')},
+            {value: 'system', label: t('settings.themeSystem')},
           ]}
           value={themeMode}
           onChange={v => setThemeModeContext(v)}
         />
-      </SettingSection>
-
-      <SettingSection title="Models">
         <SettingRow
           bare
-          label="Manage models"
+          label={t('settings.textToSpeech')}
+          description={t('settings.textToSpeechDescription')}
+          control={
+            <Switch
+              value={settings.ttsEnabled}
+              onValueChange={v => patch({ttsEnabled: v})}
+              trackColor={{false: colors.surfaceContainerHigh, true: colors.accent}}
+              thumbColor={colors.textPrimary}
+            />
+          }
+        />
+      </SettingSection>
+
+      <LanguagePicker
+        visible={showLanguagePicker}
+        value={settings.language}
+        onClose={() => setShowLanguagePicker(false)}
+        onSelect={async code => {
+          await patch({language: code});
+          i18n.changeLanguage(code);
+        }}
+      />
+
+      <SettingSection title={t('settings.models')}>
+        <SettingRow
+          bare
+          label={t('settings.manageModels')}
           description="Download, delete, browse the catalog"
           control={
             <PrimaryButton
@@ -444,8 +514,120 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
         />
       </SettingSection>
 
+      <SettingSection
+        title={t('settings.internetSearch')}
+        description="Let Pals search the web with their own tools. Bring your own API key — PocketPal never holds your keys or routes your queries.">
+        <View style={styles.searchDisclosure}>
+          <Text style={[typography.body, {fontWeight: '700'}]}>Searches leave your device</Text>
+          <Text style={[typography.caption, {color: colors.textSecondary}, styles.rowDescription]}>
+            When a Pal searches the web, your query is sent to Brave over the internet. Keys and
+            queries are never sent to PocketPal.
+          </Text>
+          {!settings.searchDisclosureAccepted && (
+            <PrimaryButton
+              label="I understand"
+              onPress={() => patch({searchDisclosureAccepted: true})}
+              style={styles.disclosureButton}
+            />
+          )}
+        </View>
+        <SettingRow
+          bare
+          label="Search provider"
+          control={
+            <View style={[styles.contextPill, {backgroundColor: colors.surfaceContainerHigh}]}>
+              <Text style={[styles.contextPillLabel, {color: colors.textSecondary}]}>Brave</Text>
+            </View>
+          }
+        />
+        <SettingRow
+          bare
+          label="API key"
+          description={
+            braveKeySet
+              ? 'Key saved.'
+              : settings.searchDisclosureAccepted
+              ? 'No key set for Brave.'
+              : 'Accept the disclosure above to set a key and enable search.'
+          }
+          control={
+            <PrimaryButton
+              label={braveKeySet ? 'Change' : 'Set Key'}
+              variant="secondary"
+              disabled={!settings.searchDisclosureAccepted}
+              onPress={() => setShowBraveKeyModal(true)}
+            />
+          }
+        />
+        <SliderSetting
+          label="Results per search"
+          description="Fewer results keep more room in the model's context."
+          value={settings.searchResultsCount}
+          min={1}
+          max={10}
+          step={1}
+          onChange={v => patch({searchResultsCount: v})}
+        />
+      </SettingSection>
+
+      <SecretInputModal
+        visible={showBraveKeyModal}
+        title="Brave Search API Key"
+        placeholder="BSA..."
+        onClose={() => setShowBraveKeyModal(false)}
+        onSave={async value => {
+          await setSecret(SECRET_SERVICE.braveApiKey, value);
+          setBraveKeySet(true);
+        }}
+      />
+
+      <SettingSection title={t('settings.apiSettings')}>
+        <SettingRow
+          bare
+          label={t('settings.huggingFaceToken')}
+          description={
+            hfTokenSet
+              ? 'Token saved. Used to access gated models from Hugging Face.'
+              : 'Set a token to access gated models from Hugging Face.'
+          }
+          control={
+            <PrimaryButton
+              label={hfTokenSet ? 'Change' : 'Set Token'}
+              variant="secondary"
+              onPress={() => setShowHfTokenModal(true)}
+            />
+          }
+        />
+        <SettingRow
+          bare
+          label="Use HF Token"
+          description="Enable to use token for API requests. Disable if token is causing authentication issues."
+          control={
+            <Switch
+              value={settings.useHfToken}
+              onValueChange={v => patch({useHfToken: v})}
+              disabled={!hfTokenSet}
+              trackColor={{false: colors.surfaceContainerHigh, true: colors.accent}}
+              thumbColor={colors.textPrimary}
+            />
+          }
+        />
+      </SettingSection>
+
+      <SecretInputModal
+        visible={showHfTokenModal}
+        title="Hugging Face Token"
+        placeholder="hf_..."
+        onClose={() => setShowHfTokenModal(false)}
+        onSave={async value => {
+          await setSecret(SECRET_SERVICE.hfToken, value);
+          setHfTokenSet(true);
+          await patch({useHfToken: true});
+        }}
+      />
+
       {downloaded.length > 0 && (
-        <SettingSection title="Storage">
+        <SettingSection title={t('settings.storage')}>
           {downloaded.map(model => (
             <SettingRow
               bare
@@ -464,7 +646,7 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
         </SettingSection>
       )}
 
-      <SettingSection title="Privacy">
+      <SettingSection title={t('settings.privacy')}>
         <SettingRow
           bare
           label="Everything runs on-device"
@@ -473,8 +655,8 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
         />
       </SettingSection>
 
-      <SettingSection title="About">
-        <SettingRow bare label="Version" control={<Text style={typography.caption}>{packageJson.version}</Text>} />
+      <SettingSection title={t('settings.about')}>
+        <SettingRow bare label={t('settings.version')} control={<Text style={typography.caption}>{packageJson.version}</Text>} />
         <SettingRow
           bare
           label="Translation Test"
@@ -493,6 +675,17 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
 }
 
 const styles = StyleSheet.create({
+  searchDisclosure: {paddingVertical: spacing.sm},
+  disclosureButton: {alignSelf: 'flex-start', marginTop: spacing.xs},
+  languageChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
   stepper: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm},
   stepperButton: {
     width: 32,
@@ -500,22 +693,18 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surfaceContainerHigh,
   },
-  stepperLabel: {color: colors.textPrimary, fontSize: 18, fontWeight: '700'},
-  stepperValue: {...typography.body, minWidth: 40, textAlign: 'center'},
-  contextRow: {flexDirection: 'row', gap: spacing.xs},
+  stepperLabel: {fontSize: 18, fontWeight: '700'},
+  stepperValue: {minWidth: 40, textAlign: 'center'},
+  contextRow: {flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap'},
   contextPill: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: radius.pill,
-    backgroundColor: colors.surfaceContainerHigh,
   },
-  contextPillActive: {backgroundColor: colors.accent},
   contextPillDisabled: {opacity: 0.4},
-  contextPillLabel: {fontSize: 12, fontWeight: '600', color: colors.textSecondary},
-  contextPillLabelActive: {color: colors.onAccent},
-  chevron: {color: colors.textMuted, fontSize: 20},
+  contextPillLabel: {fontSize: 12, fontWeight: '600'},
+  chevron: {fontSize: 20},
   sliderControl: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs},
   sliderTrackWrap: {flex: 1},
   valueBox: {
@@ -524,25 +713,19 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: colors.border,
     alignItems: 'center',
   },
-  valueBoxText: {...typography.body},
   segmentedControl: {
     flexDirection: 'row',
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
     overflow: 'hidden',
     marginTop: spacing.xs,
     alignSelf: 'flex-start',
   },
   segment: {paddingVertical: 10, paddingHorizontal: spacing.md},
-  segmentBorder: {borderLeftWidth: 1, borderLeftColor: colors.border},
-  segmentActive: {backgroundColor: colors.surfaceContainerHigh},
-  segmentLabel: {...typography.body, color: colors.textSecondary},
-  segmentLabelActive: {color: colors.textPrimary, fontWeight: '700'},
+  segmentBorder: {borderLeftWidth: 1},
   bareBlock: {paddingVertical: spacing.sm},
-  cacheTypeDescription: {...typography.caption, color: colors.textSecondary, marginTop: 2, marginBottom: spacing.xs},
+  rowDescription: {marginTop: 2, marginBottom: spacing.xs},
   cacheTypeScroll: {marginTop: spacing.xs},
 });

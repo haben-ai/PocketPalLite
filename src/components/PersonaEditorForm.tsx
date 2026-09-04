@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {colors, radius, spacing, typography} from '../theme';
 import {DownloadedModel, Persona} from '../types';
 import {PrimaryButton} from './PrimaryButton';
@@ -15,6 +15,7 @@ type Draft = {
   avatarEmoji: string;
   systemPrompt: string;
   defaultModelId?: string;
+  internetSearchEnabled: boolean;
 };
 
 export function PersonaEditorForm({
@@ -33,6 +34,9 @@ export function PersonaEditorForm({
   const [avatarEmoji, setAvatarEmoji] = useState(initial?.avatarEmoji ?? AVATAR_CHOICES[0]);
   const [systemPrompt, setSystemPrompt] = useState(initial?.systemPrompt ?? '');
   const [defaultModelId, setDefaultModelId] = useState(initial?.defaultModelId);
+  const [internetSearchEnabled, setInternetSearchEnabled] = useState(
+    initial?.internetSearchEnabled ?? false,
+  );
 
   const canSave = name.trim().length > 0 && systemPrompt.trim().length > 0;
 
@@ -78,6 +82,21 @@ export function PersonaEditorForm({
         multiline
       />
 
+      <View style={styles.searchToggleRow}>
+        <View style={styles.searchToggleText}>
+          <Text style={typography.body}>Internet Search</Text>
+          <Text style={styles.searchToggleDescription}>
+            Let this Pal search the web (also needs Internet Search set up in Settings).
+          </Text>
+        </View>
+        <Switch
+          value={internetSearchEnabled}
+          onValueChange={setInternetSearchEnabled}
+          trackColor={{false: colors.surfaceContainerHigh, true: colors.accent}}
+          thumbColor={colors.textPrimary}
+        />
+      </View>
+
       {downloadedModels.length > 0 && (
         <>
           <Text style={styles.label}>Default model (optional)</Text>
@@ -103,6 +122,7 @@ export function PersonaEditorForm({
               avatarEmoji,
               systemPrompt: systemPrompt.trim(),
               defaultModelId,
+              internetSearchEnabled,
             })
           }
           style={styles.flexButton}
@@ -144,4 +164,13 @@ const styles = StyleSheet.create({
   },
   actions: {flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg, marginBottom: spacing.xl},
   flexButton: {flex: 1},
+  searchToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+  searchToggleText: {flex: 1},
+  searchToggleDescription: {...typography.caption, marginTop: 2},
 });

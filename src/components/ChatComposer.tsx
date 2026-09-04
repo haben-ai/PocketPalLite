@@ -1,6 +1,8 @@
 import React from 'react';
 import {Image, StyleSheet, Text, TextInput, TouchableOpacity, View} from 'react-native';
-import {colors, radius, spacing, typography} from '../theme';
+import {useTranslation} from 'react-i18next';
+import {radius, spacing} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 
 /**
  * Extracted from ChatScreen.tsx's former inline composer JSX -- pure
@@ -35,16 +37,18 @@ export function ChatComposer({
   onCancelEdit?: () => void;
 }) {
   const canSend = ready && !isGenerating && (!!value.trim() || !!pendingImagePath);
+  const {colors, typography} = useTheme();
+  const {t} = useTranslation();
 
   return (
     <View>
       {editingLabel ? (
         <View style={styles.editingRow}>
-          <Text style={styles.editingLabel} numberOfLines={1}>
+          <Text style={[typography.caption, {color: colors.accent}, styles.editingLabel]} numberOfLines={1}>
             {editingLabel}
           </Text>
           <TouchableOpacity onPress={onCancelEdit}>
-            <Text style={styles.editingCancel}>Cancel</Text>
+            <Text style={[typography.caption, {color: colors.textSecondary}]}>{t('common.cancel')}</Text>
           </TouchableOpacity>
         </View>
       ) : null}
@@ -53,42 +57,56 @@ export function ChatComposer({
         <View style={styles.pendingImageRow}>
           <Image
             source={{uri: `file://${pendingImagePath}`}}
-            style={styles.pendingImageThumb}
+            style={[styles.pendingImageThumb, {backgroundColor: colors.surfaceContainerHigh}]}
           />
-          <TouchableOpacity onPress={onRemoveImage} style={styles.removeImageButton}>
-            <Text style={styles.removeImageLabel}>✕</Text>
+          <TouchableOpacity
+            onPress={onRemoveImage}
+            style={[styles.removeImageButton, {backgroundColor: colors.surfaceContainerHigh}]}>
+            <Text style={{color: colors.textSecondary, fontSize: 12, fontWeight: '700'}}>✕</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      <View style={styles.inputRow}>
+      <View style={[styles.inputRow, {borderTopColor: colors.border}]}>
         {isVisionModel && (
           <TouchableOpacity
             onPress={onAttach}
             disabled={!ready}
-            style={[styles.attachButton, !ready && {opacity: 0.4}]}>
+            style={[
+              styles.attachButton,
+              {backgroundColor: colors.surfaceContainerHigh},
+              !ready && {opacity: 0.4},
+            ]}>
             <Text style={styles.attachLabel}>📷</Text>
           </TouchableOpacity>
         )}
         <TextInput
           value={value}
           onChangeText={onChangeText}
-          placeholder={ready ? 'Message...' : 'Waiting for model...'}
+          placeholder={ready ? t('chat.messagePlaceholder') : 'Waiting for model...'}
           placeholderTextColor={colors.textMuted}
-          style={styles.input}
+          style={[
+            styles.input,
+            {backgroundColor: colors.surface, color: colors.textPrimary, borderColor: colors.border},
+          ]}
           editable={ready}
           multiline
         />
         {isGenerating ? (
-          <TouchableOpacity onPress={onStop} style={styles.stopButton}>
-            <View style={styles.stopIcon} />
+          <TouchableOpacity
+            onPress={onStop}
+            style={[styles.stopButton, {backgroundColor: colors.accent}]}>
+            <View style={[styles.stopIcon, {backgroundColor: colors.onAccent}]} />
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
             onPress={onSend}
             disabled={!canSend}
-            style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}>
-            <Text style={styles.sendLabel}>↑</Text>
+            style={[
+              styles.sendButton,
+              {backgroundColor: canSend ? colors.accent : colors.surfaceContainerHigh},
+            ]}>
+            <Text style={[styles.sendLabel, {color: colors.onAccent}]}>↑</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -104,8 +122,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.xs,
   },
-  editingLabel: {...typography.caption, color: colors.accent, flexShrink: 1},
-  editingCancel: {...typography.caption, color: colors.textSecondary},
+  editingLabel: {flexShrink: 1},
   pendingImageRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -117,17 +134,14 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: radius.sm,
-    backgroundColor: colors.surfaceContainerHigh,
   },
   removeImageButton: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  removeImageLabel: {color: colors.textSecondary, fontSize: 12, fontWeight: '700'},
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -135,7 +149,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     gap: spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
   },
   attachButton: {
     width: 44,
@@ -143,19 +156,15 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surfaceContainerHigh,
   },
   attachLabel: {fontSize: 18},
   input: {
     flex: 1,
-    backgroundColor: colors.surface,
-    color: colors.textPrimary,
     borderRadius: 18,
     paddingHorizontal: 16,
     paddingVertical: 10,
     maxHeight: 120,
     borderWidth: 1,
-    borderColor: colors.border,
   },
   // Circular icon buttons, monochrome (white bg / near-black glyph),
   // matching ChatGPT's send button -- no color accent, no glow.
@@ -165,22 +174,18 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.accent,
   },
-  sendButtonDisabled: {backgroundColor: colors.surfaceContainerHigh},
-  sendLabel: {color: colors.onAccent, fontWeight: '700', fontSize: 18, lineHeight: 20},
+  sendLabel: {fontWeight: '700', fontSize: 18, lineHeight: 20},
   stopButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.accent,
   },
   stopIcon: {
     width: 12,
     height: 12,
     borderRadius: 2,
-    backgroundColor: colors.onAccent,
   },
 });

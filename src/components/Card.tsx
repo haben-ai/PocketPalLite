@@ -1,17 +1,20 @@
 import React, {PropsWithChildren} from 'react';
-import {StyleSheet, View, ViewStyle} from 'react-native';
-import {colors, elevation, radius, spacing} from '../theme';
+import {StyleProp, StyleSheet, View, ViewStyle} from 'react-native';
+import {elevation, radius, spacing} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 
 export function Card({
   children,
   style,
   highlighted,
-}: PropsWithChildren<{style?: ViewStyle; highlighted?: boolean}>) {
+}: PropsWithChildren<{style?: StyleProp<ViewStyle>; highlighted?: boolean}>) {
+  const {colors} = useTheme();
   return (
     <View
       style={[
         styles.card,
-        highlighted && styles.highlighted,
+        {backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant},
+        highlighted && [styles.highlighted, {borderColor: colors.accent}],
         style,
       ]}>
       {children}
@@ -21,15 +24,12 @@ export function Card({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surfaceContainer,
     borderRadius: radius.lg,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
     ...elevation.level1,
   },
   highlighted: {
-    borderColor: colors.accent,
     borderWidth: 1.5,
     ...elevation.level2,
   },

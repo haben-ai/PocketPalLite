@@ -10,7 +10,9 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import {colors, motion, radius, spacing, typography} from '../theme';
+import {useTranslation} from 'react-i18next';
+import {motion, radius, spacing} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 import {Conversation, DownloadedModel} from '../types';
 import {AppScreen} from '../navigation/types';
 import {getModelById} from '../data/models';
@@ -31,13 +33,6 @@ import {
 } from './GlassIcons';
 
 const DRAWER_WIDTH = Math.min(320, Dimensions.get('window').width * 0.84);
-
-const MENU_ITEMS: {icon: React.ReactNode; label: string; screen: AppScreen}[] = [
-  {icon: <GlassGridIcon />, label: 'Models', screen: {name: 'models'}},
-  {icon: <GlassMaskIcon />, label: 'AIPals', screen: {name: 'aipals'}},
-  {icon: <GlassSparkleIcon />, label: 'Discover', screen: {name: 'discover'}},
-  {icon: <GlassGearIcon />, label: 'Settings', screen: {name: 'settings'}},
-];
 
 function modelDisplayName(modelId: string, downloaded: DownloadedModel[]): string {
   const catalogModel = getModelById(modelId);
@@ -89,6 +84,15 @@ export function ConversationDrawer({
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [downloadedModels, setDownloadedModels] = useState<DownloadedModel[]>([]);
   const [showModelPicker, setShowModelPicker] = useState(false);
+  const {colors, typography} = useTheme();
+  const {t} = useTranslation();
+
+  const MENU_ITEMS: {icon: React.ReactNode; label: string; screen: AppScreen}[] = [
+    {icon: <GlassGridIcon />, label: t('drawer.models'), screen: {name: 'models'}},
+    {icon: <GlassMaskIcon />, label: t('drawer.aipals'), screen: {name: 'aipals'}},
+    {icon: <GlassSparkleIcon />, label: t('drawer.discover'), screen: {name: 'discover'}},
+    {icon: <GlassGearIcon />, label: t('drawer.settings'), screen: {name: 'settings'}},
+  ];
 
   const refresh = useCallback(async () => {
     const [convos, models] = await Promise.all([
@@ -130,9 +134,9 @@ export function ConversationDrawer({
 
   const handleDelete = (conversation: Conversation) => {
     Alert.alert('Delete chat', `Delete "${conversation.title}"?`, [
-      {text: 'Cancel', style: 'cancel'},
+      {text: t('common.cancel'), style: 'cancel'},
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           await deleteConversation(conversation.id);
@@ -153,7 +157,7 @@ export function ConversationDrawer({
       pointerEvents={visible ? 'box-none' : 'none'}>
       <TouchableWithoutFeedback onPress={onClose}>
         <Animated.View
-          style={[styles.backdrop, {opacity: backdropOpacity}]}
+          style={[styles.backdrop, {backgroundColor: colors.scrim, opacity: backdropOpacity}]}
           pointerEvents={visible ? 'auto' : 'none'}
         />
       </TouchableWithoutFeedback>
@@ -161,17 +165,24 @@ export function ConversationDrawer({
       <Animated.View
         style={[
           styles.drawer,
-          {width: DRAWER_WIDTH, transform: [{translateX}]},
+          {
+            width: DRAWER_WIDTH,
+            backgroundColor: colors.sidebarBackground,
+            borderRightColor: colors.outlineVariant,
+            transform: [{translateX}],
+          },
         ]}>
         {showModelPicker ? (
-          <View style={styles.pickerSection}>
-            <Text style={styles.pickerLabel}>Start a new chat with:</Text>
+          <View style={[styles.pickerSection, {backgroundColor: colors.surfaceContainer}]}>
+            <Text style={typography.caption}>Start a new chat with:</Text>
             <ModelPickerList
               models={downloadedModels}
               onSelect={handleStartNewChat}
             />
             <TouchableOpacity onPress={() => setShowModelPicker(false)}>
-              <Text style={styles.cancelPicker}>Cancel</Text>
+              <Text style={[typography.caption, styles.cancelPicker, {color: colors.textPrimary}]}>
+                {t('common.cancel')}
+              </Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -179,7 +190,7 @@ export function ConversationDrawer({
             style={styles.menuRow}
             onPress={() => setShowModelPicker(true)}>
             <GlassNewChatIcon />
-            <Text style={styles.menuLabel}>New chat</Text>
+            <Text style={typography.body}>{t('drawer.newChat')}</Text>
           </TouchableOpacity>
         )}
 
@@ -189,17 +200,19 @@ export function ConversationDrawer({
             style={styles.menuRow}
             onPress={() => navigateAndClose(item.screen)}>
             {item.icon}
-            <Text style={styles.menuLabel}>{item.label}</Text>
+            <Text style={typography.body}>{item.label}</Text>
           </TouchableOpacity>
         ))}
 
-        <Text style={styles.sectionLabel}>Chats</Text>
+        <Text style={[typography.small, styles.sectionLabel, {color: colors.textMuted}]}>
+          {t('drawer.chats')}
+        </Text>
         <FlatList
           data={conversations}
           keyExtractor={item => item.id}
           style={styles.list}
           ListEmptyComponent={
-            <Text style={styles.emptyHint}>No conversations yet.</Text>
+            <Text style={[typography.caption, styles.emptyHint]}>{t('drawer.noConversations')}</Text>
           }
           renderItem={({item}) => {
             const catalogModel = getModelById(item.modelId);
@@ -209,11 +222,11 @@ export function ConversationDrawer({
                 onPress={() => onOpenConversation(item.modelId, item.id)}
                 onLongPress={() => handleDelete(item)}>
                 <View style={{flex: 1}}>
-                  <Text style={styles.rowTitle} numberOfLines={1}>
+                  <Text style={typography.body} numberOfLines={1}>
                     {item.title}
                   </Text>
                   <View style={styles.rowMeta}>
-                    <Text style={styles.rowModel} numberOfLines={1}>
+                    <Text style={typography.small} numberOfLines={1}>
                       {modelDisplayName(item.modelId, downloadedModels)}
                     </Text>
                     {catalogModel?.capability === 'vision' && (
@@ -221,7 +234,7 @@ export function ConversationDrawer({
                     )}
                   </View>
                 </View>
-                <Text style={styles.rowDate}>{formatRelativeDate(item.updatedAt)}</Text>
+                <Text style={typography.small}>{formatRelativeDate(item.updatedAt)}</Text>
               </TouchableOpacity>
             );
           }}
@@ -234,16 +247,13 @@ export function ConversationDrawer({
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#000000',
   },
   drawer: {
     position: 'absolute',
     top: 0,
     bottom: 0,
     left: 0,
-    backgroundColor: colors.sidebarBackground,
     borderRightWidth: 1,
-    borderRightColor: colors.outlineVariant,
     paddingTop: spacing.xl,
     paddingHorizontal: spacing.sm,
   },
@@ -255,23 +265,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     borderRadius: radius.md,
   },
-  menuLabel: {...typography.body},
   pickerSection: {
-    backgroundColor: colors.surfaceContainer,
     borderRadius: radius.md,
     padding: spacing.sm,
   },
-  pickerLabel: {...typography.caption, marginBottom: spacing.xs},
   cancelPicker: {
-    ...typography.caption,
-    color: colors.textPrimary,
     textAlign: 'center',
     marginTop: spacing.xs,
     paddingVertical: 6,
   },
   sectionLabel: {
-    ...typography.small,
-    color: colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginTop: spacing.md,
@@ -287,9 +290,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     gap: spacing.sm,
   },
-  rowTitle: {...typography.body},
   rowMeta: {flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2},
-  rowModel: {...typography.small, flexShrink: 1},
-  rowDate: {...typography.small},
-  emptyHint: {...typography.caption, marginTop: spacing.sm, paddingHorizontal: spacing.sm},
+  emptyHint: {marginTop: spacing.sm, paddingHorizontal: spacing.sm},
 });

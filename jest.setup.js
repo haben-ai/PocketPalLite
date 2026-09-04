@@ -88,3 +88,26 @@ jest.mock('onnxruntime-react-native', () => ({
 jest.mock('@huggingface/tokenizers', () => ({
   Tokenizer: {fromFile: jest.fn()},
 }));
+
+// react-native-keychain's native module isn't available under Jest either --
+// hit via secureStorage.ts (SettingsTabScreen.tsx -> RootNavigator.tsx).
+jest.mock('react-native-keychain', () => ({
+  setGenericPassword: jest.fn(() => Promise.resolve(true)),
+  getGenericPassword: jest.fn(() => Promise.resolve(false)),
+  resetGenericPassword: jest.fn(() => Promise.resolve(true)),
+}));
+
+// react-native-tts constructs a NativeEventEmitter from its native module at
+// import time, which is null under Jest -- hit via ttsService.ts
+// (ChatScreen.tsx -> RootNavigator.tsx).
+jest.mock('react-native-tts', () => ({
+  __esModule: true,
+  default: {
+    getInitStatus: jest.fn(() => Promise.resolve()),
+    setDefaultLanguage: jest.fn(),
+    setDucking: jest.fn(),
+    speak: jest.fn(),
+    stop: jest.fn(),
+    addEventListener: jest.fn(),
+  },
+}));

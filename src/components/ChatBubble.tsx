@@ -1,7 +1,9 @@
 import React from 'react';
 import {Image, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
-import {colors, radius, spacing, typography} from '../theme';
+import {useTranslation} from 'react-i18next';
+import {radius, spacing} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 import {ChatMessage} from '../types';
 import {TypingIndicator} from './TypingIndicator';
 import {GlassCopyIcon, GlassRegenerateIcon, GlassEditIcon} from './GlassIcons';
@@ -25,6 +27,8 @@ export function ChatBubble({
   // bubble; once text starts arriving, just show it plainly (matching
   // ChatGPT -- no trailing cursor once streaming is underway).
   const waitingForFirstToken = isStreaming && message.content.length === 0;
+  const {colors} = useTheme();
+  const {t} = useTranslation();
 
   return (
     <View
@@ -33,18 +37,23 @@ export function ChatBubble({
         {justifyContent: isUser ? 'flex-end' : 'flex-start'},
       ]}>
       <View style={isUser ? styles.userMaxWidth : styles.assistantMaxWidth}>
-        <View style={[styles.bubble, isUser ? styles.userBubble : styles.assistantBubble]}>
+        <View
+          style={[
+            styles.bubble,
+            {backgroundColor: isUser ? colors.userBubble : colors.assistantBubble},
+            isUser ? styles.userBubbleCorner : styles.assistantBubblePadding,
+          ]}>
           {message.imagePath && (
             <Image
               source={{uri: `file://${message.imagePath}`}}
-              style={styles.image}
+              style={[styles.image, {backgroundColor: colors.surfaceContainerHigh}]}
               resizeMode="cover"
             />
           )}
           {waitingForFirstToken ? (
             <TypingIndicator />
           ) : (
-            <Text style={styles.text}>{message.content}</Text>
+            <Text style={[styles.text, {color: colors.textPrimary}]}>{message.content}</Text>
           )}
         </View>
 
@@ -56,19 +65,19 @@ export function ChatBubble({
                 onPress={() => Clipboard.setString(message.content)}
                 hitSlop={6}>
                 <GlassCopyIcon />
-                <Text style={styles.actionLabel}>Copy</Text>
+                <Text style={[styles.actionLabel, {color: colors.textSecondary}]}>{t('chat.copy')}</Text>
               </TouchableOpacity>
             )}
             {!isUser && onRegenerate && (
               <TouchableOpacity style={styles.actionButton} onPress={onRegenerate} hitSlop={6}>
                 <GlassRegenerateIcon />
-                <Text style={styles.actionLabel}>Regenerate</Text>
+                <Text style={[styles.actionLabel, {color: colors.textSecondary}]}>{t('chat.regenerate')}</Text>
               </TouchableOpacity>
             )}
             {isUser && onEdit && (
               <TouchableOpacity style={styles.actionButton} onPress={onEdit} hitSlop={6}>
                 <GlassEditIcon />
-                <Text style={styles.actionLabel}>Edit</Text>
+                <Text style={[styles.actionLabel, {color: colors.textSecondary}]}>{t('chat.edit')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -87,24 +96,17 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: radius.lg,
   },
-  userBubble: {
-    backgroundColor: colors.userBubble,
-    borderBottomRightRadius: 4,
-  },
+  userBubbleCorner: {borderBottomRightRadius: 4},
   // No fill, no border -- assistant replies are plain text on the
   // background, matching ChatGPT (only user messages get a bubble).
-  assistantBubble: {
-    backgroundColor: colors.assistantBubble,
-    paddingHorizontal: 0,
-  },
+  assistantBubblePadding: {paddingHorizontal: 0},
   image: {
     width: '100%',
     aspectRatio: 4 / 3,
     borderRadius: radius.md,
     marginBottom: spacing.xs,
-    backgroundColor: colors.surfaceContainerHigh,
   },
-  text: {color: colors.textPrimary, fontSize: 15, lineHeight: 22},
+  text: {fontSize: 15, lineHeight: 22},
   actions: {
     flexDirection: 'row',
     gap: spacing.md,
@@ -112,5 +114,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   actionButton: {flexDirection: 'row', alignItems: 'center', gap: 4},
-  actionLabel: {...typography.small, color: colors.textSecondary},
+  actionLabel: {fontSize: 11, fontWeight: '500'},
 });

@@ -1,0 +1,57 @@
+{
+  "drawer": {
+    "newChat": "Nuevo chat",
+    "models": "Modelos",
+    "aipals": "AIPals",
+    "discover": "Descubrir",
+    "settings": "Configuración",
+    "chats": "Chats",
+    "noConversations": "Aún no hay conversaciones."
+  },
+  "chat": {
+    "messagePlaceholder": "Mensaje...",
+    "copy": "Copiar",
+    "regenerate": "Regenerar",
+    "edit": "Editar",
+    "editingMessage": "Editando mensaje",
+    "cancel": "Cancelar"
+  },
+  "settings": {
+    "title": "Configuración",
+    "modelInitialization": "Configuración de inicialización del modelo",
+    "deviceSelection": "Selección de dispositivo",
+    "deviceSelectionDescription": "Solo CPU - No se detectaron aceleradores de hardware",
+    "contextSize": "Tamaño de contexto",
+    "advancedSettings": "Configuración avanzada",
+    "memorySettings": "Configuración de memoria",
+    "useMemoryLock": "Usar bloqueo de memoria",
+    "memoryMapping": "Mapeo de memoria",
+    "modelLoadingSettings": "Configuración de carga del modelo",
+    "autoOffload": "Descarga automática",
+    "autoNavigate": "Navegar automáticamente al chat",
+    "appSettings": "Configuración de la app",
+    "theme": "Tema",
+    "themeLight": "Claro",
+    "themeDark": "Oscuro",
+    "themeSystem": "Sistema",
+    "language": "Idioma",
+    "textToSpeech": "Texto a voz",
+    "textToSpeechDescription": "Leer las respuestas del asistente en voz alta.",
+    "internetSearch": "Búsqueda en internet",
+    "apiSettings": "Configuración de API",
+    "huggingFaceToken": "Token de Hugging Face",
+    "models": "Modelos",
+    "manageModels": "Gestionar modelos",
+    "storage": "Almacenamiento",
+    "privacy": "Privacidad",
+    "about": "Acerca de",
+    "version": "Versión"
+  },
+  "common": {
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "save": "Guardar",
+    "open": "Abrir",
+    "back": "Atrás"
+  }
+}

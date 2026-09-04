@@ -226,3 +226,123 @@ export function GlassEditIcon({size = SMALL_SIZE}: {size?: number}) {
     </Svg>
   );
 }
+
+/** Filter/sort control -- three horizontal sliders, each with a draggable
+ * knob at a different position along its track. Used for the Models
+ * screen's filter/view/reset menu trigger. */
+export function GlassSlidersIcon({size = SIZE}: {size?: number}) {
+  const rows: [number, number][] = [
+    [7, 15],
+    [12, 9],
+    [17, 17],
+  ];
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <GlassDefs />
+      {rows.map(([y, knobX]) => (
+        <React.Fragment key={y}>
+          <Rect x={3} y={y - 0.9} width={18} height={1.8} rx={0.9} fill="url(#glassFill)" opacity={0.55} />
+          <Circle cx={knobX} cy={y} r={2.4} fill="url(#glassFill)" />
+        </React.Fragment>
+      ))}
+      <Highlight cx={10} cy={7.3} rx={1.1} ry={0.6} />
+    </Svg>
+  );
+}
+
+/** "+" trigger for the Models screen's Add Model menu. */
+export function GlassPlusIcon({size = SIZE}: {size?: number}) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <GlassDefs />
+      <Rect x={10.6} y={4} width={2.8} height={16} rx={1.4} fill="url(#glassFill)" />
+      <Rect x={4} y={10.6} width={16} height={2.8} rx={1.4} fill="url(#glassFill)" />
+      <Highlight cx={9} cy={7} rx={1.6} ry={1.1} />
+    </Svg>
+  );
+}
+
+/** Folder-plus, used for "Add Local Model". */
+export function GlassFolderIcon({size = SIZE}: {size?: number}) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <GlassDefs />
+      <Path
+        d="M3 6.5C3 5.67 3.67 5 4.5 5h4.4l2 2H19.5c.83 0 1.5.67 1.5 1.5v9c0 .83-.67 1.5-1.5 1.5h-15C3.67 19 3 18.33 3 17.5v-11Z"
+        fill="url(#glassFill)"
+      />
+      <Rect x={11} y={10} width={2} height={6} rx={1} fill="#14141a" />
+      <Rect x={9} y={12} width={6} height={2} rx={1} fill="#14141a" />
+      <Highlight cx={8} cy={7.6} rx={2.8} ry={1} />
+    </Svg>
+  );
+}
+
+/** Cloud with a download arrow, used for "Add Remote Model" (paste a
+ * direct download URL). */
+export function GlassCloudIcon({size = SIZE}: {size?: number}) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <GlassDefs />
+      <Path
+        d="M7.5 17C5.57 17 4 15.43 4 13.5c0-1.76 1.3-3.22 3-3.46C7.3 7.8 9.24 6.2 11.5 6.2c2.5 0 4.58 1.87 4.93 4.3H17c1.93 0 3.5 1.57 3.5 3.5S18.93 17 17 17H7.5Z"
+        fill="url(#glassFill)"
+      />
+      <Rect x={11} y={12} width={2} height={5.5} rx={1} fill="#14141a" />
+      <Path d="M9 15.2 12 18.5l3-3.3H9Z" fill="#14141a" />
+      <Highlight cx={9} cy={9.4} rx={2.6} ry={1} />
+    </Svg>
+  );
+}
+
+/** Small trash icon for per-row delete actions. */
+export function GlassTrashIcon({size = SMALL_SIZE + 2}: {size?: number}) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <GlassDefs />
+      <Rect x={5} y={7.5} width={14} height={13} rx={2} fill="url(#glassFill)" />
+      <Rect x={3.5} y={5} width={17} height={2.2} rx={1.1} fill="url(#glassFill)" />
+      <Rect x={9} y={2.5} width={6} height={2.4} rx={1.2} fill="url(#glassFill)" />
+      <Rect x={9.5} y={10.5} width={1.8} height={7} rx={0.9} fill="#14141a" />
+      <Rect x={12.7} y={10.5} width={1.8} height={7} rx={0.9} fill="#14141a" />
+      <Highlight cx={8.5} cy={9.4} rx={2} ry={0.8} />
+    </Svg>
+  );
+}
+
+/** Small "×" glyph in a circular glass chip -- dismiss/hide actions. */
+export function GlassCloseIcon({size = SMALL_SIZE + 2}: {size?: number}) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <GlassDefs />
+      <Circle cx={12} cy={12} r={9.5} fill="url(#glassFill)" />
+      <Path
+        d="M8.2 8.2 15.8 15.8M15.8 8.2 8.2 15.8"
+        stroke="#14141a"
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+      <Highlight cx={9} cy={8.6} rx={2.6} ry={1.2} />
+    </Svg>
+  );
+}
+
+/** Small upward-arrow-out-of-tray glyph for the "Offload" action on the
+ * currently active/loaded model. */
+export function GlassOffloadIcon({size = SMALL_SIZE + 2}: {size?: number}) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <GlassDefs />
+      <Path
+        d="M12 15.5V4M12 4 8 8M12 4l4 4"
+        stroke="url(#glassFill)"
+        strokeWidth={2.4}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <Rect x={4.5} y={17.5} width={15} height={2.6} rx={1.3} fill="url(#glassFill)" />
+      <Highlight cx={9} cy={6.6} rx={1.6} ry={0.9} />
+    </Svg>
+  );
+}

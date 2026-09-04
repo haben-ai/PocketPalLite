@@ -94,6 +94,9 @@ export type Persona = {
   defaultModelId?: string;
   /** True only for the seeded Riya persona -- blocks deletion, not editing. */
   isBuiltIn: boolean;
+  /** Lets this persona use Internet Search (still gated globally by the
+   * Settings > Internet Search disclosure + a configured provider/key). */
+  internetSearchEnabled?: boolean;
   createdAt: number;
   updatedAt: number;
 };

@@ -1,6 +1,7 @@
 import React, {Children, isValidElement} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
-import {colors, radius, spacing, typography} from '../theme';
+import {radius, spacing} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 import {Card} from './Card';
 
 /**
@@ -18,15 +19,18 @@ export function SettingSection({
   description?: string;
   children: React.ReactNode;
 }) {
+  const {colors, typography} = useTheme();
   const rows = Children.toArray(children).filter(isValidElement);
 
   return (
     <View style={styles.wrapper}>
-      <Text style={styles.title}>{title}</Text>
-      {description ? <Text style={styles.description}>{description}</Text> : null}
+      <Text style={[typography.heading, styles.title, {color: colors.textSecondary}]}>{title}</Text>
+      {description ? <Text style={[typography.caption, styles.description]}>{description}</Text> : null}
       <Card style={styles.card}>
         {rows.map((row, index) => (
-          <View key={index} style={index > 0 ? styles.divider : undefined}>
+          <View
+            key={index}
+            style={index > 0 ? [styles.divider, {borderTopColor: colors.outlineVariant}] : undefined}>
             {row}
           </View>
         ))}
@@ -38,14 +42,12 @@ export function SettingSection({
 const styles = StyleSheet.create({
   wrapper: {marginBottom: spacing.lg},
   title: {
-    ...typography.heading,
     marginBottom: spacing.xs,
-    color: colors.textSecondary,
     textTransform: 'uppercase',
     fontSize: 13,
     letterSpacing: 0.5,
   },
-  description: {...typography.caption, marginBottom: spacing.sm},
+  description: {marginBottom: spacing.sm},
   card: {padding: spacing.md, borderRadius: radius.lg},
-  divider: {borderTopWidth: 1, borderTopColor: colors.outlineVariant},
+  divider: {borderTopWidth: 1},
 });

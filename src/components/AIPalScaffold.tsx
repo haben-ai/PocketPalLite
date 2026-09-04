@@ -1,6 +1,7 @@
 import React from 'react';
 import {SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, ViewStyle} from 'react-native';
-import {colors, spacing} from '../theme';
+import {spacing} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 
 /**
  * Shared screen-level chrome: safe area + flat background + standard
@@ -22,11 +23,12 @@ export function AIPalScaffold({
   contentStyle?: ViewStyle;
   onBack?: () => void;
 }) {
+  const {colors} = useTheme();
   return (
-    <SafeAreaView style={styles.root}>
+    <SafeAreaView style={[styles.root, {backgroundColor: colors.background}]}>
       {onBack && (
         <TouchableOpacity onPress={onBack} style={styles.backRow} hitSlop={8}>
-          <Text style={styles.backLabel}>‹ Back</Text>
+          <Text style={[styles.backLabel, {color: colors.textPrimary}]}>‹ Back</Text>
         </TouchableOpacity>
       )}
       {scroll ? (
@@ -44,10 +46,7 @@ export function AIPalScaffold({
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+  root: {flex: 1},
   flex: {flex: 1},
   content: {
     paddingHorizontal: spacing.md,
@@ -63,5 +62,5 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: spacing.xs,
   },
-  backLabel: {color: colors.textPrimary, fontSize: 15, fontWeight: '600'},
+  backLabel: {fontSize: 15, fontWeight: '600'},
 });

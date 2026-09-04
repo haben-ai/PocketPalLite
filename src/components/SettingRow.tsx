@@ -1,6 +1,7 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
-import {colors, spacing, typography} from '../theme';
+import {spacing} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 import {Card} from './Card';
 
 export function SettingRow({
@@ -16,11 +17,12 @@ export function SettingRow({
    * SettingSection, which supplies one shared card for the whole group. */
   bare?: boolean;
 }) {
+  const {typography} = useTheme();
   const content = (
     <>
       <View style={styles.text}>
         <Text style={typography.body}>{label}</Text>
-        {description ? <Text style={styles.description}>{description}</Text> : null}
+        {description ? <Text style={[typography.caption, styles.description]}>{description}</Text> : null}
       </View>
       {control}
     </>
@@ -49,5 +51,5 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   text: {flex: 1},
-  description: {...typography.caption, color: colors.textSecondary, marginTop: 2},
+  description: {marginTop: 2},
 });
