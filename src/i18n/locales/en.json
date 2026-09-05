@@ -4,7 +4,9 @@
     "models": "Models",
     "aipals": "AIPals",
     "discover": "Discover",
+    "benchmark": "Benchmark",
     "settings": "Settings",
+    "appInfo": "App Info",
     "chats": "Chats",
     "noConversations": "No conversations yet."
   },

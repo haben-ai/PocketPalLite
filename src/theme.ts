@@ -1,12 +1,17 @@
-import {Platform} from 'react-native';
-
-// iOS's system font is already SF Pro -- naming it explicitly here (rather
-// than leaving fontFamily unset) makes that intentional instead of
-// incidental. SF Pro itself is Apple-proprietary and its license restricts
-// bundling the font files outside Apple platforms, so Android intentionally
-// keeps its own native system font (Roboto) rather than trying to smuggle
-// SF Pro's files onto it.
-const systemFont = Platform.select({ios: 'System', default: undefined});
+// Noto Sans, bundled as a variable font (android/app/src/main/assets/fonts/
+// NotoSans.ttf, registered for iOS via Info.plist's UIAppFonts -- the iOS
+// Xcode target itself still needs the Fonts folder added as a build
+// resource before this takes effect there; untested on iOS since this
+// project has only ever been built/run on Android in this environment).
+// Referencing it by filename (no extension) is Android's font-linking
+// convention; if the font isn't actually available (e.g. iOS before the
+// Xcode step), RN silently falls back to the system font rather than
+// crashing, so this is safe to set unconditionally on both platforms.
+const systemFont = 'NotoSans';
+/** JetBrains Mono, for code blocks only -- see ChatBubble's fenced-code
+ * rendering, the only place this is used. */
+const monoFont = 'JetBrainsMono-Regular';
+const monoFontBold = 'JetBrainsMono-Bold';
 
 // ChatGPT-inspired monochrome dark theme: near-black flat backgrounds,
 // minimal color. Accent color is reserved for meaningful functional states
@@ -84,6 +89,9 @@ export const typography = {
   body: {fontSize: 15, fontWeight: '400' as const, color: colors.textPrimary, fontFamily: systemFont},
   caption: {fontSize: 13, fontWeight: '400' as const, color: colors.textSecondary, fontFamily: systemFont},
   small: {fontSize: 11, fontWeight: '500' as const, color: colors.textMuted, fontFamily: systemFont},
+  /** Code blocks only -- JetBrains Mono, not the UI's Noto Sans. */
+  code: {fontSize: 13, fontWeight: '400' as const, color: colors.textPrimary, fontFamily: monoFont},
+  codeBold: {fontSize: 13, fontWeight: '700' as const, color: colors.textPrimary, fontFamily: monoFontBold},
 };
 
 /**

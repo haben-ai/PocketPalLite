@@ -14,7 +14,18 @@ function tierFromRam(totalRamGB: number): ModelTier {
   return 'strong';
 }
 
+/** The app's single default recommendation, regardless of device tier --
+ * a well-rounded model that's small enough to fit virtually any phone.
+ * Only overridden by the tier-based "sweet spot" logic below when it
+ * genuinely doesn't fit the device's free storage. */
+export const DEFAULT_MODEL_ID = 'gemma3-1b';
+
 function pickRecommendedModel(tier: ModelTier, freeStorageGB: number): string {
+  const defaultModel = MODEL_CATALOG.find(m => m.id === DEFAULT_MODEL_ID);
+  if (defaultModel && defaultModel.sizeBytes / GB < freeStorageGB - 0.5) {
+    return defaultModel.id;
+  }
+
   // Vision models are excluded from the general "what fits my phone"
   // recommendation -- a user tapping Analyze My Phone wants a general chat
   // model, not to be steered toward a (also larger) vision model.

@@ -1,4 +1,4 @@
-import {initLlama, LlamaContext} from '@pocketpalai/llama.rn';
+import {initLlama, LlamaContext, BenchResult} from '@pocketpalai/llama.rn';
 import {InferenceEngine, adaptLlamaContext} from './inferenceEngine';
 import {DEFAULT_CONTEXT_SIZE} from './contextWindow';
 import {CacheType} from '../storage/appSettings';
@@ -120,6 +120,35 @@ export async function getInferenceEngine(
 
 export function getActiveModelId(): string | null {
   return activeModelId;
+}
+
+export type BenchmarkOutcome = {
+  result: BenchResult;
+  /** Real GGUF metadata read at load time (llama.rn's own LlamaContext.model
+   * field) -- includes the actual parameter count (nParams), not the
+   * catalog's rounded "1B"-style label. */
+  model: LlamaContext['model'];
+};
+
+/**
+ * Runs llama.cpp's real bench harness (llama.rn's ctx.bench(), which wraps
+ * llama-bench) against the given model, loading it first if it isn't
+ * already the active context. Reuses the exact same init path as chat
+ * (getOrInitContext), so a benchmark reflects the same context/memory/
+ * threading settings a real chat session would use. Not cancellable --
+ * llama.rn's bench() exposes no cancel handle, unlike model downloads.
+ */
+export async function runBenchmark(
+  modelId: string,
+  filePath: string,
+  mmprojPath: string | undefined,
+  initOptions: ContextInitOptions,
+  params: {pp: number; tg: number; pl: number; nr: number},
+  onModelLoadProgress?: (progress: number) => void,
+): Promise<BenchmarkOutcome> {
+  const ctx = await getOrInitContext(modelId, filePath, mmprojPath, onModelLoadProgress, initOptions);
+  const result = await ctx.bench(params.pp, params.tg, params.pl, params.nr);
+  return {result, model: ctx.model};
 }
 
 /**

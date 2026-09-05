@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {elevation, radius, spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
-import {GlassCloudIcon, GlassFolderIcon} from './GlassIcons';
+import {CloudIcon, FolderIcon, PlusIcon, CloseIcon} from './Icons';
 
 /**
  * Floating "+" button (bottom-right of the Models screen) that fans out
@@ -55,15 +55,27 @@ export function AddModelFab({
         {open && (
           <View style={styles.menu}>
             {menuItem('Add from Hugging Face', <Text style={styles.emoji}>🤗</Text>, onAddFromHuggingFace)}
-            {menuItem('Add Local Model', <GlassFolderIcon size={18} />, onAddLocal)}
-            {menuItem('Add Remote Model', <GlassCloudIcon size={18} />, onAddRemote)}
+            {menuItem(
+              'Add Local Model',
+              <FolderIcon size={18} color={colors.textPrimary} />,
+              onAddLocal,
+            )}
+            {menuItem(
+              'Add Remote Model',
+              <CloudIcon size={18} color={colors.textPrimary} />,
+              onAddRemote,
+            )}
           </View>
         )}
         <TouchableOpacity
           style={[styles.fab, elevation.level2, {backgroundColor: colors.accent}]}
           activeOpacity={0.85}
           onPress={() => setOpen(v => !v)}>
-          <Text style={[styles.fabGlyph, {color: colors.onAccent}]}>{open ? '×' : '+'}</Text>
+          {open ? (
+            <CloseIcon size={26} color={colors.onAccent} />
+          ) : (
+            <PlusIcon size={26} color={colors.onAccent} />
+          )}
         </TouchableOpacity>
       </View>
     </>
@@ -84,7 +96,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fabGlyph: {fontSize: 30, fontWeight: '400', lineHeight: 32},
   menu: {marginBottom: spacing.md, gap: spacing.sm, alignItems: 'flex-end'},
   menuItem: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm},
   labelPill: {

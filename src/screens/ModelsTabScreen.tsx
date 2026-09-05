@@ -33,7 +33,7 @@ import {ModelsFilterMenu} from '../components/ModelsFilterMenu';
 import {AddModelFab} from '../components/AddModelFab';
 import {AddRemoteModelModal} from '../components/AddRemoteModelModal';
 import {HuggingFaceSearchModal} from '../components/HuggingFaceSearchModal';
-import {GlassSlidersIcon} from '../components/GlassIcons';
+import {SlidersIcon} from '../components/Icons';
 
 type DownloadState = {fraction: number; cancel: () => void} | undefined;
 
@@ -103,7 +103,16 @@ export function ModelsTabScreen({highlightModelId, onNavigate}: Props) {
   const handleAnalyze = useCallback(async () => {
     setAnalyzing(true);
     try {
-      setDevice(await analyzeDevice());
+      // The real analysis (two DeviceInfo calls) resolves near-instantly --
+      // padding it to 2-3 seconds makes "Checking your phone..." read as
+      // genuine analysis happening rather than a suspiciously instant
+      // flash, without ever faking the result itself.
+      const minDuration = 2000 + Math.random() * 1000;
+      const [result] = await Promise.all([
+        analyzeDevice(),
+        new Promise(resolve => setTimeout(resolve, minDuration)),
+      ]);
+      setDevice(result);
     } catch (err: any) {
       Alert.alert('Could not analyze device', err.message ?? String(err));
     } finally {
@@ -375,7 +384,7 @@ export function ModelsTabScreen({highlightModelId, onNavigate}: Props) {
           style={[styles.filterButton, {backgroundColor: colors.surfaceContainerHigh}]}
           onPress={() => setFilterMenuOpen(true)}
           hitSlop={6}>
-          <GlassSlidersIcon size={20} />
+          <SlidersIcon size={20} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
       <Text style={styles.subtitle}>Download a model to chat fully offline.</Text>

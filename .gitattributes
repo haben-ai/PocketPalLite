@@ -1,0 +1,21 @@
+# Normalize everything to LF in the repo; each OS's own checkout still
+# converts as needed, so this removes the CRLF/LF ambiguity warnings on
+# Windows without forcing Mac/Linux contributors into CRLF.
+* text=auto eol=lf
+
+# Fonts and binary assets must never go through text/line-ending
+# conversion -- doing so would corrupt them.
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.jar binary
+*.keystore binary
+*.so binary
+*.gguf binary

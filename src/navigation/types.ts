@@ -15,4 +15,6 @@ export type AppScreen =
   | {name: 'models'; highlightModelId?: string}
   | {name: 'aipals'}
   | {name: 'discover'}
-  | {name: 'settings'};
+  | {name: 'settings'}
+  | {name: 'benchmark'}
+  | {name: 'appInfo'};

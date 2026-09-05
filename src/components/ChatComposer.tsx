@@ -1,5 +1,6 @@
 import React from 'react';
 import {Image, StyleSheet, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {ArrowUp, Image as ImageIcon} from 'lucide-react-native';
 import {useTranslation} from 'react-i18next';
 import {radius, spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
@@ -77,13 +78,13 @@ export function ChatComposer({
               {backgroundColor: colors.surfaceContainerHigh},
               !ready && {opacity: 0.4},
             ]}>
-            <Text style={styles.attachLabel}>📷</Text>
+            <ImageIcon size={20} color={colors.textPrimary} />
           </TouchableOpacity>
         )}
         <TextInput
           value={value}
           onChangeText={onChangeText}
-          placeholder={ready ? t('chat.messagePlaceholder') : 'Waiting for model...'}
+          placeholder={ready ? t('chat.messagePlaceholder') : 'Loading model ...'}
           placeholderTextColor={colors.textMuted}
           style={[
             styles.input,
@@ -106,7 +107,7 @@ export function ChatComposer({
               styles.sendButton,
               {backgroundColor: canSend ? colors.accent : colors.surfaceContainerHigh},
             ]}>
-            <Text style={[styles.sendLabel, {color: colors.onAccent}]}>↑</Text>
+            <ArrowUp size={20} color={colors.onAccent} />
           </TouchableOpacity>
         )}
       </View>
@@ -157,7 +158,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  attachLabel: {fontSize: 18},
   input: {
     flex: 1,
     borderRadius: 18,
@@ -175,7 +175,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendLabel: {fontWeight: '700', fontSize: 18, lineHeight: 20},
   stopButton: {
     width: 36,
     height: 36,

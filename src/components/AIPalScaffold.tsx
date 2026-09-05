@@ -1,16 +1,20 @@
 import React from 'react';
-import {SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, ViewStyle} from 'react-native';
+import {SafeAreaView, ScrollView, StyleSheet, TouchableOpacity, View, ViewStyle} from 'react-native';
 import {spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
+import {MenuIcon} from './Icons';
 
 /**
  * Shared screen-level chrome: safe area + flat background + standard
  * horizontal padding. Every screen previously inlined this combination
  * separately -- this is the one place it lives now.
  *
- * `onBack`, when passed, renders a minimal back row above the content --
- * with no bottom tab bar any more, Models/AIPals/Discover/Settings are only
- * reachable via the sidebar and need their own way back to Chat.
+ * `onBack`, when passed, renders a hamburger-icon row above the content --
+ * with no bottom tab bar any more, Models/AIPals/Discover/Settings/
+ * Benchmark/App Info are only reachable via the sidebar, and this always
+ * returns to Chat (the app's main navigation), not a literal "previous
+ * screen" -- the hamburger glyph signals that destination rather than a
+ * back-arrow's "undo the last step" implication.
  */
 export function AIPalScaffold({
   children,
@@ -28,7 +32,7 @@ export function AIPalScaffold({
     <SafeAreaView style={[styles.root, {backgroundColor: colors.background}]}>
       {onBack && (
         <TouchableOpacity onPress={onBack} style={styles.backRow} hitSlop={8}>
-          <Text style={[styles.backLabel, {color: colors.textPrimary}]}>‹ Back</Text>
+          <MenuIcon color={colors.textPrimary} />
         </TouchableOpacity>
       )}
       {scroll ? (
@@ -62,5 +66,4 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: spacing.xs,
   },
-  backLabel: {fontSize: 15, fontWeight: '600'},
 });

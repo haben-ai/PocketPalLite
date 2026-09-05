@@ -8,6 +8,7 @@ const KEYS = {
     `pocketpal:conversation:${conversationId}`,
   personas: 'pocketpal:personas',
   appSettings: 'pocketpal:app_settings',
+  benchmarkRuns: 'pocketpal:benchmark_runs',
 };
 
 export {KEYS};

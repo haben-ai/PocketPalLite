@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {AppState, Platform} from 'react-native';
+import {AppState, View} from 'react-native';
 import {hasSeenOnboarding, setOnboardingSeen} from './src/storage/asyncStore';
 import {OnboardingScreen} from './src/screens/OnboardingScreen';
 import {RootNavigator} from './src/navigation/RootNavigator';
@@ -43,11 +43,16 @@ export default function App() {
   }, []);
 
   if (route.screen === 'loading') {
-    return null;
+    // Rendered before ThemeProvider mounts, so this can't read the theme
+    // system yet -- hardcoding the same OLED black the app always opens
+    // into either way. Paired with android:windowBackground (styles.xml),
+    // this keeps every cold start on a continuous black frame instead of
+    // flashing AppCompat's default light background before this paints.
+    return <View style={{flex: 1, backgroundColor: '#000000'}} />;
   }
 
   return (
-    <ThemeProvider systemFont={Platform.select({ios: 'System', default: undefined})}>
+    <ThemeProvider systemFont="NotoSans">
       {route.screen === 'onboarding' ? (
         <OnboardingScreen
           onDone={async () => {

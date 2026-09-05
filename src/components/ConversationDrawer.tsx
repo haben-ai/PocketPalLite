@@ -2,6 +2,7 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   Alert,
   Animated,
+  BackHandler,
   Dimensions,
   FlatList,
   StyleSheet,
@@ -25,12 +26,14 @@ import {getDownloadedModels} from '../storage/modelRegistry';
 import {CapabilityBadge} from './Badge';
 import {ModelPickerList} from './ModelPickerList';
 import {
-  GlassGridIcon,
-  GlassMaskIcon,
-  GlassSparkleIcon,
-  GlassGearIcon,
-  GlassNewChatIcon,
-} from './GlassIcons';
+  GridIcon,
+  MaskIcon,
+  SparkleIcon,
+  GearIcon,
+  NewChatIcon,
+  SpeedometerIcon,
+  InfoIcon,
+} from './Icons';
 
 const DRAWER_WIDTH = Math.min(320, Dimensions.get('window').width * 0.84);
 
@@ -88,10 +91,16 @@ export function ConversationDrawer({
   const {t} = useTranslation();
 
   const MENU_ITEMS: {icon: React.ReactNode; label: string; screen: AppScreen}[] = [
-    {icon: <GlassGridIcon />, label: t('drawer.models'), screen: {name: 'models'}},
-    {icon: <GlassMaskIcon />, label: t('drawer.aipals'), screen: {name: 'aipals'}},
-    {icon: <GlassSparkleIcon />, label: t('drawer.discover'), screen: {name: 'discover'}},
-    {icon: <GlassGearIcon />, label: t('drawer.settings'), screen: {name: 'settings'}},
+    {icon: <GridIcon color={colors.textPrimary} />, label: t('drawer.models'), screen: {name: 'models'}},
+    {icon: <MaskIcon color={colors.textPrimary} />, label: t('drawer.aipals'), screen: {name: 'aipals'}},
+    {icon: <SparkleIcon color={colors.textPrimary} />, label: t('drawer.discover'), screen: {name: 'discover'}},
+    {
+      icon: <SpeedometerIcon color={colors.textPrimary} />,
+      label: t('drawer.benchmark'),
+      screen: {name: 'benchmark'},
+    },
+    {icon: <GearIcon color={colors.textPrimary} />, label: t('drawer.settings'), screen: {name: 'settings'}},
+    {icon: <InfoIcon color={colors.textPrimary} />, label: t('drawer.appInfo'), screen: {name: 'appInfo'}},
   ];
 
   const refresh = useCallback(async () => {
@@ -108,6 +117,21 @@ export function ConversationDrawer({
   // intermittent bug where the drawer would occasionally never reappear
   // after tapping the hamburger. Always-mounted + pointerEvents toggling is
   // a simpler, more robust pattern for a component this size.
+  // Registered only while the drawer is open, so it takes priority over
+  // RootNavigator's own hardwareBackPress handler (RN's BackHandler checks
+  // the most-recently-added listener first) -- back closes the drawer
+  // instead of falling through to navigate/exit.
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      onClose();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [visible, onClose]);
+
   useEffect(() => {
     if (visible) {
       setShowModelPicker(false);
@@ -189,7 +213,7 @@ export function ConversationDrawer({
           <TouchableOpacity
             style={styles.menuRow}
             onPress={() => setShowModelPicker(true)}>
-            <GlassNewChatIcon />
+            <NewChatIcon color={colors.textPrimary} />
             <Text style={typography.body}>{t('drawer.newChat')}</Text>
           </TouchableOpacity>
         )}

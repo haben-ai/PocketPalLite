@@ -44,10 +44,21 @@ jest.mock('react-native-fs', () => ({
 }));
 
 // react-native-device-info's native module isn't available under Jest
-// either -- same pre-existing gap, hit via deviceAnalyzer.ts.
+// either -- same pre-existing gap, hit via deviceAnalyzer.ts. Also covers
+// the sync getters BenchmarkScreen/AppInfoScreen call (getBrand, getModel,
+// etc.) so those screens don't crash if a future test renders them.
 jest.mock('react-native-device-info', () => ({
   getTotalMemory: jest.fn(() => Promise.resolve(8 * 1024 ** 3)),
   getFreeDiskStorage: jest.fn(() => Promise.resolve(10 * 1024 ** 3)),
+  getUsedMemory: jest.fn(() => Promise.resolve(1 * 1024 ** 3)),
+  getUsedMemorySync: jest.fn(() => 1 * 1024 ** 3),
+  getBrand: jest.fn(() => 'TestBrand'),
+  getModel: jest.fn(() => 'TestModel'),
+  getSystemVersion: jest.fn(() => '13'),
+  getApplicationName: jest.fn(() => 'PocketPalLite'),
+  getBundleId: jest.fn(() => 'com.pocketpallite'),
+  getBuildNumber: jest.fn(() => '1'),
+  getVersion: jest.fn(() => '0.0.1'),
 }));
 
 // @dariyd/react-native-pdf-page-image's TurboModule isn't available under

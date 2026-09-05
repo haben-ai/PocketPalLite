@@ -6,7 +6,8 @@ import {radius, spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
 import {ChatMessage} from '../types';
 import {TypingIndicator} from './TypingIndicator';
-import {GlassCopyIcon, GlassRegenerateIcon, GlassEditIcon} from './GlassIcons';
+import {MarkdownCodeText} from './MarkdownCodeText';
+import {CopyIcon, RegenerateIcon, EditIcon} from './Icons';
 
 export function ChatBubble({
   message,
@@ -53,7 +54,7 @@ export function ChatBubble({
           {waitingForFirstToken ? (
             <TypingIndicator />
           ) : (
-            <Text style={[styles.text, {color: colors.textPrimary}]}>{message.content}</Text>
+            <MarkdownCodeText content={message.content} color={colors.textPrimary} />
           )}
         </View>
 
@@ -64,19 +65,19 @@ export function ChatBubble({
                 style={styles.actionButton}
                 onPress={() => Clipboard.setString(message.content)}
                 hitSlop={6}>
-                <GlassCopyIcon />
+                <CopyIcon color={colors.textSecondary} />
                 <Text style={[styles.actionLabel, {color: colors.textSecondary}]}>{t('chat.copy')}</Text>
               </TouchableOpacity>
             )}
             {!isUser && onRegenerate && (
               <TouchableOpacity style={styles.actionButton} onPress={onRegenerate} hitSlop={6}>
-                <GlassRegenerateIcon />
+                <RegenerateIcon color={colors.textSecondary} />
                 <Text style={[styles.actionLabel, {color: colors.textSecondary}]}>{t('chat.regenerate')}</Text>
               </TouchableOpacity>
             )}
             {isUser && onEdit && (
               <TouchableOpacity style={styles.actionButton} onPress={onEdit} hitSlop={6}>
-                <GlassEditIcon />
+                <EditIcon color={colors.textSecondary} />
                 <Text style={[styles.actionLabel, {color: colors.textSecondary}]}>{t('chat.edit')}</Text>
               </TouchableOpacity>
             )}
@@ -106,7 +107,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     marginBottom: spacing.xs,
   },
-  text: {fontSize: 15, lineHeight: 22},
   actions: {
     flexDirection: 'row',
     gap: spacing.md,

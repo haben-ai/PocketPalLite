@@ -52,10 +52,10 @@ import {ChatComposer} from '../components/ChatComposer';
 import {ModelSelector} from '../components/ModelSelector';
 import {PersonaSelector} from '../components/PersonaSelector';
 import {HeaderMenu} from '../components/HeaderMenu';
-import {GlassIconButton} from '../components/Icons';
-import {GlassMenuIcon, GlassNewChatIcon, GlassDotsIcon} from '../components/GlassIcons';
+import {GlassIconButton, MenuIcon, NewChatIcon, DotsIcon} from '../components/Icons';
 import {GenerationSettingsSheet} from '../components/GenerationSettingsSheet';
 import {DottedSpinner} from '../components/DottedSpinner';
+import {ChatLoadingState} from '../components/ChatLoadingState';
 import {ExportImportSheet} from '../components/ExportImportSheet';
 import {speak} from '../services/ttsService';
 import {BraveSearchProvider, formatSearchResultsForContext} from '../services/searchProvider';
@@ -574,7 +574,7 @@ export function ChatScreen({
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
       <View style={styles.header}>
         <GlassIconButton onPress={onOpenDrawer}>
-          <GlassMenuIcon />
+          <MenuIcon color={colors.textPrimary} />
         </GlassIconButton>
         <View style={styles.headerTitles}>
           <TouchableOpacity
@@ -603,15 +603,13 @@ export function ChatScreen({
         </View>
         <View style={styles.headerActions}>
           <GlassIconButton onPress={() => onNewChat(activeModelId, persona?.id ?? personaId)}>
-            <GlassNewChatIcon />
+            <NewChatIcon color={colors.textPrimary} />
           </GlassIconButton>
           <GlassIconButton onPress={handleOpenHeaderMenu}>
-            <GlassDotsIcon />
+            <DotsIcon color={colors.textPrimary} />
           </GlassIconButton>
         </View>
       </View>
-
-      {status ? <Text style={[typography.caption, styles.status]}>{status}</Text> : null}
 
       <ModelSelector
         visible={showModelSwitcher}
@@ -661,25 +659,33 @@ export function ChatScreen({
       <KeyboardAvoidingView
         style={{flex: 1}}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <FlatList
-          ref={listRef}
-          data={displayMessages}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.list}
-          renderItem={({item}) => (
-            <ChatBubble
-              message={item}
-              isStreaming={item.id === 'streaming'}
-              onRegenerate={
-                lastAssistantMessage?.id === item.id ? handleRegenerate : undefined
-              }
-              onEdit={lastUserMessage?.id === item.id ? handleEditLastMessage : undefined}
-            />
-          )}
-          onContentSizeChange={() =>
-            listRef.current?.scrollToEnd({animated: true})
-          }
-        />
+        {ready ? (
+          <FlatList
+            ref={listRef}
+            data={displayMessages}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.list}
+            renderItem={({item}) => (
+              <ChatBubble
+                message={item}
+                isStreaming={item.id === 'streaming'}
+                onRegenerate={
+                  lastAssistantMessage?.id === item.id ? handleRegenerate : undefined
+                }
+                onEdit={lastUserMessage?.id === item.id ? handleEditLastMessage : undefined}
+              />
+            )}
+            onContentSizeChange={() =>
+              listRef.current?.scrollToEnd({animated: true})
+            }
+          />
+        ) : (
+          // The model isn't loaded yet (or failed to load) -- show the
+          // centered icon/headline/status state instead of an empty list.
+          // This entirely disappears once `ready` flips true, same turn the
+          // FlatList above takes over.
+          <ChatLoadingState status={status} />
+        )}
 
         <ChatComposer
           value={input}
@@ -732,9 +738,5 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   chevron: {fontSize: 14},
-  status: {
-    textAlign: 'center',
-    paddingVertical: spacing.xs,
-  },
   list: {paddingVertical: spacing.sm, flexGrow: 1},
 });

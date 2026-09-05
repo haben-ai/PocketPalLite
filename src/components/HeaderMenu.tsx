@@ -1,8 +1,9 @@
 import React, {useEffect, useState} from 'react';
 import {Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
-import {colors, radius, spacing, typography} from '../theme';
+import {radius, spacing} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 import {DownloadedModel} from '../types';
-import {GlassGearIcon, GlassGridIcon, GlassUploadIcon} from './GlassIcons';
+import {GearIcon, GridIcon, UploadIcon} from './Icons';
 import {ModelPickerList} from './ModelPickerList';
 
 /**
@@ -30,6 +31,7 @@ export function HeaderMenu({
   activeModelId?: string;
   onSelectModel: (modelId: string) => void;
 }) {
+  const {colors, typography} = useTheme();
   const [modelExpanded, setModelExpanded] = useState(false);
 
   // Collapse the submenu whenever the menu itself closes, so it doesn't
@@ -44,7 +46,6 @@ export function HeaderMenu({
     glyph: React.ReactNode,
     label: string,
     onPress: () => void,
-    showChevron?: boolean,
   ) => (
     <TouchableOpacity
       style={styles.item}
@@ -53,24 +54,34 @@ export function HeaderMenu({
         onPress();
       }}>
       {glyph}
-      <Text style={styles.itemLabel}>{label}</Text>
-      {showChevron && <Text style={styles.chevron}>›</Text>}
+      <Text style={[typography.body, styles.itemLabel]}>{label}</Text>
     </TouchableOpacity>
   );
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose}>
+      <TouchableOpacity
+        style={[styles.backdrop, {backgroundColor: colors.scrim}]}
+        activeOpacity={1}
+        onPress={onClose}>
         <View style={styles.cardAnchor}>
-          <View style={styles.card}>
-            {item(<GlassGearIcon />, 'Generation settings', onOpenGenerationSettings)}
+          <View
+            style={[
+              styles.card,
+              {backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant},
+            ]}>
+            {item(
+              <GearIcon color={colors.textPrimary} />,
+              'Generation settings',
+              onOpenGenerationSettings,
+            )}
 
-            <TouchableOpacity
-              style={styles.item}
-              onPress={() => setModelExpanded(v => !v)}>
-              <GlassGridIcon />
-              <Text style={styles.itemLabel}>Model</Text>
-              <Text style={styles.chevron}>{modelExpanded ? '⌄' : '›'}</Text>
+            <TouchableOpacity style={styles.item} onPress={() => setModelExpanded(v => !v)}>
+              <GridIcon color={colors.textPrimary} />
+              <Text style={[typography.body, styles.itemLabel]}>Model</Text>
+              <Text style={[styles.chevron, {color: colors.textMuted}]}>
+                {modelExpanded ? '⌄' : '›'}
+              </Text>
             </TouchableOpacity>
             {modelExpanded && (
               <ScrollView style={styles.submenu} nestedScrollEnabled>
@@ -85,7 +96,7 @@ export function HeaderMenu({
               </ScrollView>
             )}
 
-            {item(<GlassUploadIcon />, 'Export/Import', onOpenExportImport)}
+            {item(<UploadIcon color={colors.textPrimary} />, 'Export/Import', onOpenExportImport)}
           </View>
         </View>
       </TouchableOpacity>
@@ -94,17 +105,15 @@ export function HeaderMenu({
 }
 
 const styles = StyleSheet.create({
-  backdrop: {flex: 1, backgroundColor: '#00000066'},
+  backdrop: {flex: 1},
   cardAnchor: {
     position: 'absolute',
     top: 56,
     right: spacing.md,
   },
   card: {
-    backgroundColor: colors.surfaceContainerHigh,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
     paddingVertical: spacing.xs,
     minWidth: 220,
     maxWidth: 280,
@@ -116,8 +125,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     gap: spacing.sm,
   },
-  itemLabel: {...typography.body, flex: 1},
-  chevron: {color: colors.textMuted, fontSize: 18},
+  itemLabel: {flex: 1},
+  chevron: {fontSize: 18},
   submenu: {
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,

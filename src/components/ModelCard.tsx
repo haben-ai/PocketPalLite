@@ -9,7 +9,8 @@ import {Chip, CapabilityBadge} from './Badge';
 import {PrimaryButton} from './PrimaryButton';
 import {ModelCompatibilityBadge} from './ModelCompatibilityBadge';
 import {NeuralDownloadProgress} from './NeuralDownloadProgress';
-import {GlassGearIcon, GlassOffloadIcon, GlassCloseIcon, GlassTrashIcon} from './GlassIcons';
+import {GearIcon, OffloadIcon, CloseIcon, TrashIcon} from './Icons';
+import {BlinkingDot} from './BlinkingDot';
 
 /** Normalized shape ModelCard renders -- satisfied structurally by
  * ModelInfo (catalog models) and by a lightweight object built from
@@ -103,7 +104,7 @@ export function ModelCard({
           {model.name}
         </Text>
         <Text style={[typography.small, {color: colors.textMuted}]}>{formatSize(model.sizeBytes)}</Text>
-        {isActive && <View style={[styles.activeDot, {backgroundColor: colors.success}]} />}
+        {downloadedEntry && <BlinkingDot color={isActive ? colors.success : colors.danger} />}
       </View>
 
       {model.description && (
@@ -137,7 +138,7 @@ export function ModelCard({
                 style={[styles.offloadButton, {borderColor: colors.success}]}
                 onPress={onOffload}
                 activeOpacity={0.8}>
-                <GlassOffloadIcon size={14} />
+                <OffloadIcon size={14} color={colors.success} />
                 <Text style={[typography.body, styles.offloadLabel, {color: colors.success}]}>
                   Offload
                 </Text>
@@ -158,7 +159,7 @@ export function ModelCard({
             style={[styles.iconButton, {backgroundColor: colors.surfaceContainerHigh}]}
             onPress={() => setDetailsOpen(v => !v)}
             hitSlop={4}>
-            <GlassGearIcon size={16} />
+            <GearIcon size={16} color={colors.textSecondary} />
           </TouchableOpacity>
 
           {downloadedEntry ? (
@@ -166,14 +167,14 @@ export function ModelCard({
               style={[styles.iconButton, {backgroundColor: colors.surfaceContainerHigh}]}
               onPress={onDelete}
               hitSlop={4}>
-              <GlassTrashIcon size={16} />
+              <TrashIcon size={16} color={colors.danger} />
             </TouchableOpacity>
           ) : onHide ? (
             <TouchableOpacity
               style={[styles.iconButton, {backgroundColor: colors.surfaceContainerHigh}]}
               onPress={onHide}
               hitSlop={4}>
-              <GlassCloseIcon size={16} />
+              <CloseIcon size={16} color={colors.textSecondary} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -187,7 +188,6 @@ const styles = StyleSheet.create({
   headerRow: {flexDirection: 'row', alignItems: 'center', gap: spacing.xs},
   typeIcon: {fontSize: 16},
   name: {flex: 1},
-  activeDot: {width: 8, height: 8, borderRadius: 4, marginLeft: 2},
   description: {marginTop: 4, lineHeight: 19},
   storageWarning: {marginTop: spacing.xs, fontWeight: '600'},
   detailsRow: {

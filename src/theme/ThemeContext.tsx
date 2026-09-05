@@ -13,6 +13,11 @@ export const motion = {fast: 150, base: 220, slow: 320};
 
 type ColorTokens = typeof darkColors;
 
+/** JetBrains Mono, for code blocks only (see ChatBubble's fenced-code
+ * rendering) -- never used for regular UI text. */
+const monoFont = 'JetBrainsMono-Regular';
+const monoFontBold = 'JetBrainsMono-Bold';
+
 function makeTypography(colors: ColorTokens, systemFont: string | undefined) {
   return {
     title: {fontSize: 24, fontWeight: '700' as const, color: colors.textPrimary, fontFamily: systemFont},
@@ -20,6 +25,8 @@ function makeTypography(colors: ColorTokens, systemFont: string | undefined) {
     body: {fontSize: 15, fontWeight: '400' as const, color: colors.textPrimary, fontFamily: systemFont},
     caption: {fontSize: 13, fontWeight: '400' as const, color: colors.textSecondary, fontFamily: systemFont},
     small: {fontSize: 11, fontWeight: '500' as const, color: colors.textMuted, fontFamily: systemFont},
+    code: {fontSize: 13, fontWeight: '400' as const, color: colors.textPrimary, fontFamily: monoFont},
+    codeBold: {fontSize: 13, fontWeight: '700' as const, color: colors.textPrimary, fontFamily: monoFontBold},
   };
 }
 

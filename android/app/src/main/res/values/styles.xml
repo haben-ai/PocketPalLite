@@ -4,6 +4,13 @@
     <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
         <!-- Customize your theme here. -->
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+        <!-- Without this, the window's default background (a light gray or
+             white from stock AppCompat) is what's visible for the brief
+             window between the native launch screen dismissing and React
+             painting its first (black) frame, on every cold start, not
+             just the first one ever. Matching the app's own OLED-black
+             theme here removes that flash entirely. -->
+        <item name="android:windowBackground">@android:color/black</item>
     </style>
 
 </resources>

@@ -4,7 +4,9 @@
     "models": "Modelos",
     "aipals": "AIPals",
     "discover": "Descubrir",
+    "benchmark": "Rendimiento",
     "settings": "Configuración",
+    "appInfo": "Info de la app",
     "chats": "Chats",
     "noConversations": "Aún no hay conversaciones."
   },
