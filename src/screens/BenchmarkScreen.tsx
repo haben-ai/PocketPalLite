@@ -31,7 +31,18 @@ type DeviceSummary = {
   totalRamGB: number;
 };
 
-function formatSize(bytes: number): string {
+/** Saved benchmark runs can predate a schema/field change (or be left
+ * over from a run that failed partway through a much earlier build) --
+ * every formatter here tolerates a missing/non-finite number instead of
+ * throwing, so one stale AsyncStorage entry can't crash the whole screen. */
+function safeFixed(value: number | undefined | null, digits: number): string {
+  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '--';
+}
+
+function formatSize(bytes: number | undefined | null): string {
+  if (typeof bytes !== 'number' || !Number.isFinite(bytes)) {
+    return '--';
+  }
   const gb = bytes / 1e9;
   return gb >= 1 ? `${gb.toFixed(2)} GB` : `${Math.round(bytes / 1e6)} MB`;
 }
@@ -49,7 +60,10 @@ function formatParamsLabel(nParams: number): string {
   return `${millions.toFixed(2)}M params`;
 }
 
-function formatTime(seconds: number): string {
+function formatTime(seconds: number | undefined | null): string {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds)) {
+    return '--';
+  }
   if (seconds < 1) {
     return `${Math.round(seconds * 1000)}ms`;
   }
@@ -402,13 +416,13 @@ export function BenchmarkScreen({onNavigate}: Props) {
               <View style={styles.metricsRow}>
                 <View style={styles.metricCell}>
                   <Text style={[typography.heading, styles.metricValue]}>
-                    {run.metrics.speedPp.toFixed(2)} t/s
+                    {safeFixed(run.metrics.speedPp, 2)} t/s
                   </Text>
                   <Text style={[typography.small, {color: colors.textMuted}]}>Prompt Processing</Text>
                 </View>
                 <View style={styles.metricCell}>
                   <Text style={[typography.heading, styles.metricValue]}>
-                    {run.metrics.speedTg.toFixed(2)} t/s
+                    {safeFixed(run.metrics.speedTg, 2)} t/s
                   </Text>
                   <Text style={[typography.small, {color: colors.textMuted}]}>Token Generation</Text>
                 </View>
@@ -423,13 +437,13 @@ export function BenchmarkScreen({onNavigate}: Props) {
                 <View style={styles.metricCell}>
                   <Text style={[typography.heading, styles.metricValue]}>
                     {run.metrics.totalMemoryBytes > 0
-                      ? `${((run.metrics.peakMemoryBytes / run.metrics.totalMemoryBytes) * 100).toFixed(1)}%`
+                      ? `${safeFixed((run.metrics.peakMemoryBytes / run.metrics.totalMemoryBytes) * 100, 1)}%`
                       : '--'}
                   </Text>
                   <Text style={[typography.small, {color: colors.textMuted}]}>
                     Peak Memory{'\n'}
-                    {(run.metrics.peakMemoryBytes / 1e9).toFixed(2)} GB /{' '}
-                    {(run.metrics.totalMemoryBytes / 1e9).toFixed(1)} GB
+                    {safeFixed(run.metrics.peakMemoryBytes / 1e9, 2)} GB /{' '}
+                    {safeFixed(run.metrics.totalMemoryBytes / 1e9, 1)} GB
                   </Text>
                 </View>
               </View>
