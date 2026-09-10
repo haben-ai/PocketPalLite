@@ -3,6 +3,12 @@ export type ModelTier = 'weak' | 'medium' | 'strong';
 /** Whether a model is a plain text LLM or a vision-language model. */
 export type ModelCapability = 'text' | 'vision';
 
+/** The company that trained/originated the model (not the HF repo owner
+ * that republished the GGUF, which is often a different, unrelated
+ * account) -- drives which brand mark VendorLogo shows. 'other' covers any
+ * origin without a recognized brand mark, not a guess. */
+export type ModelVendor = 'google' | 'meta' | 'microsoft' | 'other';
+
 export type ModelInfo = {
   id: string;
   name: string;
@@ -15,6 +21,19 @@ export type ModelInfo = {
   repoUrl: string;
   downloadUrl: string;
   minRamGB: number;
+  vendor: ModelVendor;
+  /** Manifest revision for this catalog entry (bumped when its downloadUrl/
+   * sha256 changes to point at different file content) -- not an upstream
+   * HF commit pin, since every entry here tracks the repo's `main` branch. */
+  version: string;
+  /** SHA-256 of the exact file at downloadUrl, verified against Hugging
+   * Face's own tree API (a GGUF's git-lfs `oid` *is* its SHA-256) before
+   * being added here -- never guessed. downloadManager checks a completed
+   * download against this before it's ever registered as usable. */
+  sha256: string;
+  /** SHA-256 of the file at mmprojUrl, same discipline as sha256 above.
+   * Present only when mmprojUrl is. */
+  mmprojSha256?: string;
   /**
    * Languages this model is known to handle natively/reliably (e.g. ['en']).
    * Optional and unused in Phase 1 -- reserved for the future translation
@@ -49,6 +68,17 @@ export type ChatMessage = {
   createdAt: number;
   /** Local path to an image attached to this message, if any (one per message). */
   imagePath?: string;
+  /** Assistant messages only -- from llama.rn's real completion timings
+   * (NativeCompletionResultTimings.predicted_per_second), not estimated. */
+  tokensPerSecond?: number;
+  /** Assistant messages only -- time to first token in ms, from llama.rn's
+   * real completion timings (NativeCompletionResultTimings.prompt_ms, the
+   * prompt-processing time before generation starts). */
+  ttftMs?: number;
+  /** Assistant messages only -- the user's own thumbs up/down on this
+   * reply. Purely local (never sent anywhere); tapping the same value again
+   * clears it back to undefined. */
+  feedback?: 'up' | 'down';
 };
 
 export type Conversation = {
@@ -80,19 +110,21 @@ export type DeviceTier = {
 
 /**
  * A named AI persona: a system prompt plus presentation (name/avatar/
- * tagline). Riya/MustaAI (see data/persona.ts) ships as the seeded
- * isBuiltIn: true persona so existing behavior is unchanged after upgrade;
- * users can create additional personas alongside it.
+ * tagline). The default assistant (see data/persona.ts) ships as the
+ * seeded isBuiltIn: true persona so existing behavior is unchanged after
+ * upgrade; users can create additional personas alongside it.
  */
 export type Persona = {
   id: string;
   name: string;
   tagline: string;
-  avatarEmoji: string;
+  /** Id of a lucide icon (see components/Icons.tsx::ASSISTANT_ICON_IDS),
+   * not an emoji character -- rendered via AssistantAvatarIcon. */
+  avatarIcon: string;
   systemPrompt: string;
   /** Pre-selects this model when starting a new chat with this persona. */
   defaultModelId?: string;
-  /** True only for the seeded Riya persona -- blocks deletion, not editing. */
+  /** True only for the seeded default persona -- blocks deletion, not editing. */
   isBuiltIn: boolean;
   /** Lets this persona use Internet Search (still gated globally by the
    * Settings > Internet Search disclosure + a configured provider/key). */

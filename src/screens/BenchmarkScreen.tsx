@@ -107,10 +107,11 @@ function Stepper({
  * a local history of results. Every number shown is either a direct field
  * from the native BenchResult, real GGUF metadata (model.nParams), or a
  * sampled measurement (peak memory, via polling DeviceInfo during the
- * run) -- nothing here is a placeholder or invented figure. GPU Layers is
- * shown as 0 because llama.rn's n_gpu_layers is iOS-only in this binding;
- * Android genuinely runs CPU-only, so that's the honest number here rather
- * than a copied one.
+ * run) -- nothing here is a placeholder or invented figure. GPU Layers
+ * reflects the real request sent to llama.cpp (99 when GPU Acceleration is
+ * on in Settings, 0 when off) -- llama.rn genuinely offloads to the device
+ * GPU on Android via an auto-selected OpenCL native library on Adreno
+ * devices, it's not iOS-only.
  */
 export function BenchmarkScreen({onNavigate}: Props) {
   const {colors, typography} = useTheme();
@@ -189,7 +190,7 @@ export function BenchmarkScreen({onNavigate}: Props) {
         nBatch: settings.nBatch,
         nUbatch: settings.nUbatch,
         nThreads: settings.nThreads,
-        gpuLayers: 0,
+        gpuLayers: settings.gpuOffloadEnabled ? 99 : 0,
         flashAttnType: settings.flashAttnType,
         cacheTypeK: settings.cacheTypeK,
         cacheTypeV: settings.cacheTypeV,
@@ -208,6 +209,7 @@ export function BenchmarkScreen({onNavigate}: Props) {
           flashAttnType: settings.flashAttnType,
           cacheTypeK: settings.cacheTypeK,
           cacheTypeV: settings.cacheTypeV,
+          gpuOffloadEnabled: settings.gpuOffloadEnabled,
         },
         {pp, tg, pl, nr},
         progress =>

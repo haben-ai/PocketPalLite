@@ -1,6 +1,7 @@
 import React from 'react';
 import {Modal, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
-import {colors, radius, spacing, typography} from '../theme';
+import {radius, spacing} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 import {DownloadedModel} from '../types';
 import {ModelPickerList} from './ModelPickerList';
 
@@ -25,15 +26,20 @@ export function ModelSelector({
   title: string;
   hint?: string;
 }) {
+  const {colors, typography} = useTheme();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity
         style={styles.backdrop}
         activeOpacity={1}
         onPress={onClose}>
-        <View style={styles.sheet}>
+        <View
+          style={[
+            styles.sheet,
+            {backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant},
+          ]}>
           <Text style={typography.heading}>{title}</Text>
-          {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+          {hint ? <Text style={[typography.caption, styles.hint]}>{hint}</Text> : null}
           <ModelPickerList
             models={models}
             activeModelId={activeModelId}
@@ -52,13 +58,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: colors.surfaceContainerLow,
     borderTopLeftRadius: radius.lg,
     borderTopRightRadius: radius.lg,
     padding: spacing.md,
     paddingBottom: spacing.xl,
     borderTopWidth: 1,
-    borderColor: colors.outlineVariant,
   },
-  hint: {...typography.caption, marginTop: 2, marginBottom: spacing.sm},
+  hint: {marginTop: 2, marginBottom: spacing.sm},
 });

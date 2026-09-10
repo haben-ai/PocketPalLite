@@ -1,13 +1,13 @@
-// Noto Sans, bundled as a variable font (android/app/src/main/assets/fonts/
-// NotoSans.ttf, registered for iOS via Info.plist's UIAppFonts -- the iOS
-// Xcode target itself still needs the Fonts folder added as a build
-// resource before this takes effect there; untested on iOS since this
-// project has only ever been built/run on Android in this environment).
-// Referencing it by filename (no extension) is Android's font-linking
-// convention; if the font isn't actually available (e.g. iOS before the
-// Xcode step), RN silently falls back to the system font rather than
-// crashing, so this is safe to set unconditionally on both platforms.
-const systemFont = 'NotoSans';
+// No custom font -- undefined resolves to the platform's own default
+// sans-serif (Roboto on Android), a real geometric/neo-grotesque typeface.
+// NotoSans.ttf stays bundled (android/app/src/main/assets/fonts/) in case a
+// future multi-language pass needs its broader Unicode coverage, it's just
+// not the active UI font. This module's own colors/typography exports are
+// effectively unused now (every screen reads theme/ThemeContext's
+// useTheme() instead, which has the same systemFont: undefined default via
+// App.tsx's <ThemeProvider>) -- kept only for the couple of non-screen call
+// sites (spacing/radius) that still import from here.
+const systemFont: string | undefined = undefined;
 /** JetBrains Mono, for code blocks only -- see ChatBubble's fenced-code
  * rendering, the only place this is used. */
 const monoFont = 'JetBrainsMono-Regular';
@@ -40,11 +40,10 @@ export const colors = {
   textSecondary: '#B4B4B4',
   textMuted: '#8E8EA0',
 
-  // No brand color -- primary actions invert (white bg / near-black text)
-  // the same way ChatGPT's send button does.
-  accent: '#FFFFFF',
-  accentMuted: '#FFFFFF1F',
-  onAccent: '#111111',
+  // Brand blue (matches the app icon's gradient).
+  accent: '#2F6FED',
+  accentMuted: '#2F6FED26',
+  onAccent: '#FFFFFF',
 
   // Assistant messages have no bubble at all (plain text on background),
   // matching ChatGPT; only user messages get a subtle filled bubble.

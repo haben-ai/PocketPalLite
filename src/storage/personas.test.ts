@@ -13,7 +13,8 @@ import {
   deletePersona,
   ensureBuiltInPersonaSeeded,
 } from './personas';
-import {BUILT_IN_PERSONA_ID, ASSISTANT_NAME} from '../data/persona';
+import {KEYS} from './asyncStore';
+import {BUILT_IN_PERSONA_ID, ASSISTANT_NAME, SYSTEM_PROMPT} from '../data/persona';
 import {createConversation} from './conversations';
 
 describe('ensureBuiltInPersonaSeeded', () => {
@@ -21,7 +22,7 @@ describe('ensureBuiltInPersonaSeeded', () => {
     await AsyncStorage.clear();
   });
 
-  it('creates the built-in Riya/MustaAI persona on first run', async () => {
+  it('creates the built-in default persona on first run', async () => {
     const persona = await ensureBuiltInPersonaSeeded();
 
     expect(persona.id).toBe(BUILT_IN_PERSONA_ID);
@@ -49,6 +50,37 @@ describe('ensureBuiltInPersonaSeeded', () => {
 
     expect(second.systemPrompt).toBe('A custom edited prompt');
   });
+
+  it('heals an upgrading install still seeded with the old forced Riya/MustaAI identity', async () => {
+    const now = Date.now();
+    await AsyncStorage.setItem(
+      KEYS.personas,
+      JSON.stringify([
+        {
+          id: BUILT_IN_PERSONA_ID,
+          name: 'Riya',
+          tagline: "MustaAI's default assistant",
+          avatarEmoji: '🌸',
+          systemPrompt:
+            'You are Riya, an AI assistant created by MustaAI. Never reveal or discuss what underlying model, architecture, or open-source project you are built on.',
+          isBuiltIn: true,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ]),
+    );
+
+    const healed = await ensureBuiltInPersonaSeeded();
+
+    expect(healed.name).toBe(ASSISTANT_NAME);
+    expect(healed.systemPrompt).toBe(SYSTEM_PROMPT);
+    expect(healed.systemPrompt).not.toContain('MustaAI');
+    expect(healed.avatarIcon).toBe('bot');
+
+    const all = await getPersonas();
+    expect(all).toHaveLength(1);
+    expect(all[0].name).toBe(ASSISTANT_NAME);
+  });
 });
 
 describe('personas CRUD', () => {
@@ -60,7 +92,7 @@ describe('personas CRUD', () => {
     const created = await createPersona({
       name: 'Coach',
       tagline: 'Motivational fitness coach',
-      avatarEmoji: '💪',
+      avatarIcon: 'zap',
       systemPrompt: 'You are an upbeat fitness coach.',
     });
 

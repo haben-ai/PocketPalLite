@@ -45,6 +45,14 @@ export type EngineCompletionParams = EngineSamplingParams & {
 
 export type EngineCompletionResult = {
   text: string;
+  /** Real measured generation speed from llama.rn's own completion timings
+   * (NativeCompletionResultTimings.predicted_per_second) -- undefined only
+   * if the native side didn't report timings for this call. */
+  tokensPerSecond?: number;
+  /** Real measured time-to-first-token in ms -- llama.rn's
+   * NativeCompletionResultTimings.prompt_ms, the prompt-processing time
+   * that elapses before the first generated token. */
+  ttftMs?: number;
 };
 
 export interface InferenceEngine {
@@ -89,7 +97,13 @@ type RawLlamaLikeContext = {
       enable_thinking?: boolean;
     },
     callback?: (data: {token: string}) => void,
-  ): Promise<{text: string}>;
+  ): Promise<{
+    text: string;
+    /** Present on real llama.rn results (NativeRNLlama.d.ts's
+     * NativeCompletionResultTimings) -- optional here so a test's plain
+     * mock context can still return just {text} without satisfying it. */
+    timings?: {prompt_ms: number; predicted_per_second: number};
+  }>;
   initMultimodal(params: {path: string; use_gpu?: boolean}): Promise<boolean>;
   stopCompletion(): Promise<void>;
   release(): Promise<void>;
@@ -124,7 +138,11 @@ export function adaptLlamaContext(raw: RawLlamaLikeContext): InferenceEngine {
           },
           onToken ? data => onToken(data.token) : undefined,
         )
-        .then(result => ({text: result.text})),
+        .then(result => ({
+          text: result.text,
+          tokensPerSecond: result.timings?.predicted_per_second,
+          ttftMs: result.timings?.prompt_ms,
+        })),
     initMultimodal: (mmprojPath, useGpu) =>
       raw.initMultimodal({path: mmprojPath, use_gpu: useGpu}),
     stop: () => raw.stopCompletion(),

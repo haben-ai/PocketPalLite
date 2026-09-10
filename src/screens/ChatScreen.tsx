@@ -43,6 +43,7 @@ import {
   createConversation,
 } from '../storage/conversations';
 import {getInferenceEngine, getActiveModelId} from '../services/llamaSession';
+import {startGeneratingInBackground, stopGeneratingInBackground} from '../services/generationService';
 import {InferenceEngine} from '../services/inferenceEngine';
 import {truncateMessagesToContext, estimateTextTokens} from '../services/contextWindow';
 import {getLanguagePipeline, DEFAULT_LANGUAGE} from '../services/languagePipeline';
@@ -52,7 +53,13 @@ import {ChatComposer} from '../components/ChatComposer';
 import {ModelSelector} from '../components/ModelSelector';
 import {PersonaSelector} from '../components/PersonaSelector';
 import {HeaderMenu} from '../components/HeaderMenu';
-import {GlassIconButton, MenuIcon, NewChatIcon, DotsIcon} from '../components/Icons';
+import {
+  GlassIconButton,
+  MenuIcon,
+  NewChatIcon,
+  DotsIcon,
+  AssistantAvatarIcon,
+} from '../components/Icons';
 import {GenerationSettingsSheet} from '../components/GenerationSettingsSheet';
 import {DottedSpinner} from '../components/DottedSpinner';
 import {ChatLoadingState} from '../components/ChatLoadingState';
@@ -127,7 +134,12 @@ export function ChatScreen({
   const stoppedRef = useRef(false);
 
   const model = getModelById(activeModelId);
-  const modelName = model?.name ?? 'Model';
+  // Header/AI-indicator display name only -- drops tuning-suffix words
+  // like "Instruct" that don't add information once you're already
+  // chatting with the model. Catalog/download-list screens intentionally
+  // keep the full name (needed there to tell same-model different-quant
+  // variants apart, e.g. "Gemma 3 1B Instruct" vs "... Instruct (Q8_0)").
+  const modelName = (model?.name ?? 'Model').replace(/\s+Instruct\b/gi, '').trim();
   const isVisionModel = model?.capability === 'vision';
 
   useEffect(() => {
@@ -181,6 +193,7 @@ export function ChatScreen({
             flashAttnType: loadedSettings.flashAttnType,
             cacheTypeK: loadedSettings.cacheTypeK,
             cacheTypeV: loadedSettings.cacheTypeV,
+            gpuOffloadEnabled: loadedSettings.gpuOffloadEnabled,
           },
         );
         if (!cancelled) {
@@ -324,6 +337,12 @@ export function ChatScreen({
     setStreamingText('');
     streamingTextRef.current = '';
     stoppedRef.current = false;
+    // Keeps Android from throttling/killing this process while the reply
+    // is still generating and the app gets minimized -- see
+    // GenerationForegroundService.kt's doc comment. Stopped in the finally
+    // block below so every exit path (success, error, user-stopped) always
+    // releases it, not just the happy path.
+    startGeneratingInBackground();
     try {
       // User -> LanguagePipeline -> InferenceEngine. NoOpLanguagePipeline
       // makes detectLanguage/translateIn identity operations, so this is a
@@ -421,6 +440,8 @@ export function ChatScreen({
         role: 'assistant',
         content: translatedOut || '(no response)',
         createdAt: Date.now(),
+        tokensPerSecond: result.tokensPerSecond,
+        ttftMs: result.ttftMs,
       };
       const finalMessages = [...nextMessages, assistantMessage];
       setMessages(finalMessages);
@@ -453,6 +474,8 @@ export function ChatScreen({
       const finalMessages = [...nextMessages, assistantMessage];
       setMessages(finalMessages);
       await saveMessages(conversationId, finalMessages);
+    } finally {
+      stopGeneratingInBackground();
     }
   };
 
@@ -548,6 +571,17 @@ export function ChatScreen({
     await runCompletion(nextMessages, editedMessage);
   };
 
+  // Purely local -- toggles a thumbs up/down on a past reply, tapping the
+  // same value again clears it. Works for any assistant message (not just
+  // the last one), unlike Regenerate/Edit which only make sense there.
+  const handleFeedback = async (messageId: string, feedback: 'up' | 'down') => {
+    const nextMessages = messages.map(m =>
+      m.id === messageId ? {...m, feedback: m.feedback === feedback ? undefined : feedback} : m,
+    );
+    setMessages(nextMessages);
+    await saveMessages(conversationId, nextMessages);
+  };
+
   // The most recent user turn, whether or not a reply already followed it
   // -- editing after seeing a bad reply is the whole point, so this can't
   // require the user message to still be the very last array item.
@@ -590,8 +624,11 @@ export function ChatScreen({
             onPress={handleOpenPersonaSwitcher}
             style={styles.switcherRow}
             hitSlop={4}>
+            {persona && (
+              <AssistantAvatarIcon id={persona.avatarIcon} size={14} color={colors.textSecondary} />
+            )}
             <Text style={[typography.caption, {color: colors.textSecondary}]} numberOfLines={1}>
-              {persona ? `${persona.avatarEmoji} ${persona.name}` : 'AIPal'}
+              {persona ? persona.name : 'AIPal'}
             </Text>
             <Text style={[styles.chevron, {color: colors.textSecondary}]}>▾</Text>
           </TouchableOpacity>
@@ -669,10 +706,13 @@ export function ChatScreen({
               <ChatBubble
                 message={item}
                 isStreaming={item.id === 'streaming'}
+                modelName={modelName}
+                avatarIconId={persona?.avatarIcon}
                 onRegenerate={
                   lastAssistantMessage?.id === item.id ? handleRegenerate : undefined
                 }
                 onEdit={lastUserMessage?.id === item.id ? handleEditLastMessage : undefined}
+                onFeedback={feedback => handleFeedback(item.id, feedback)}
               />
             )}
             onContentSizeChange={() =>
@@ -718,13 +758,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    // Asymmetric on purpose: the hamburger sits close enough to the left
-    // edge with the plain spacing.md padding that on some devices (seen on
-    // a OnePlus/Realme ColorOS phone) the system's edge back-swipe gesture
-    // zone swallows taps on it before the app ever sees them. Extra left
-    // padding clears that zone; the right side isn't affected so it stays
-    // as-is.
-    paddingLeft: spacing.xl + spacing.md,
+    // Asymmetric on purpose: with zero extra padding, the hamburger sits
+    // close enough to the left edge that on some devices (seen on a
+    // OnePlus/Realme ColorOS phone) the system's edge back-swipe gesture
+    // zone swallows taps on it before the app ever sees them. spacing.md
+    // clears that zone while keeping the icon close to the edge (moved in
+    // from a much larger padding that was pushing it noticeably inward);
+    // the right side isn't affected so it stays as-is.
+    paddingLeft: spacing.md,
     paddingRight: spacing.md,
     paddingVertical: spacing.sm,
   },

@@ -15,7 +15,6 @@ import {useTranslation} from 'react-i18next';
 import {motion, radius, spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
 import {Conversation, DownloadedModel} from '../types';
-import {AppScreen} from '../navigation/types';
 import {getModelById} from '../data/models';
 import {
   createConversation,
@@ -25,15 +24,7 @@ import {
 import {getDownloadedModels} from '../storage/modelRegistry';
 import {CapabilityBadge} from './Badge';
 import {ModelPickerList} from './ModelPickerList';
-import {
-  GridIcon,
-  MaskIcon,
-  SparkleIcon,
-  GearIcon,
-  NewChatIcon,
-  SpeedometerIcon,
-  InfoIcon,
-} from './Icons';
+import {NewChatIcon} from './Icons';
 
 const DRAWER_WIDTH = Math.min(320, Dimensions.get('window').width * 0.84);
 
@@ -66,21 +57,18 @@ function formatRelativeDate(ts: number): string {
 }
 
 /**
- * ChatGPT-style sidebar: New chat + nav menu rows fixed at top, a
- * scrollable conversation list in the middle, and Settings pinned at the
- * very bottom -- the only way to reach Models/AIPals/Discover/Settings now
- * that there's no bottom tab bar.
+ * Conversation history sidebar: New chat fixed at top, a scrollable
+ * conversation list below it. App-section navigation (Models/AIPals/More)
+ * now lives in the persistent bottom tab bar instead of here.
  */
 export function ConversationDrawer({
   visible,
   onClose,
   onOpenConversation,
-  onNavigate,
 }: {
   visible: boolean;
   onClose: () => void;
   onOpenConversation: (modelId: string, conversationId: string) => void;
-  onNavigate: (screen: AppScreen) => void;
 }) {
   const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -89,19 +77,6 @@ export function ConversationDrawer({
   const [showModelPicker, setShowModelPicker] = useState(false);
   const {colors, typography} = useTheme();
   const {t} = useTranslation();
-
-  const MENU_ITEMS: {icon: React.ReactNode; label: string; screen: AppScreen}[] = [
-    {icon: <GridIcon color={colors.textPrimary} />, label: t('drawer.models'), screen: {name: 'models'}},
-    {icon: <MaskIcon color={colors.textPrimary} />, label: t('drawer.aipals'), screen: {name: 'aipals'}},
-    {icon: <SparkleIcon color={colors.textPrimary} />, label: t('drawer.discover'), screen: {name: 'discover'}},
-    {
-      icon: <SpeedometerIcon color={colors.textPrimary} />,
-      label: t('drawer.benchmark'),
-      screen: {name: 'benchmark'},
-    },
-    {icon: <GearIcon color={colors.textPrimary} />, label: t('drawer.settings'), screen: {name: 'settings'}},
-    {icon: <InfoIcon color={colors.textPrimary} />, label: t('drawer.appInfo'), screen: {name: 'appInfo'}},
-  ];
 
   const refresh = useCallback(async () => {
     const [convos, models] = await Promise.all([
@@ -170,11 +145,6 @@ export function ConversationDrawer({
     ]);
   };
 
-  const navigateAndClose = (screen: AppScreen) => {
-    onClose();
-    onNavigate(screen);
-  };
-
   return (
     <View
       style={StyleSheet.absoluteFill}
@@ -217,16 +187,6 @@ export function ConversationDrawer({
             <Text style={typography.body}>{t('drawer.newChat')}</Text>
           </TouchableOpacity>
         )}
-
-        {MENU_ITEMS.map(item => (
-          <TouchableOpacity
-            key={item.label}
-            style={styles.menuRow}
-            onPress={() => navigateAndClose(item.screen)}>
-            {item.icon}
-            <Text style={typography.body}>{item.label}</Text>
-          </TouchableOpacity>
-        ))}
 
         <Text style={[typography.small, styles.sectionLabel, {color: colors.textMuted}]}>
           {t('drawer.chats')}

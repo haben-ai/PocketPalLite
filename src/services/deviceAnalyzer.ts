@@ -1,6 +1,7 @@
 import DeviceInfo from 'react-native-device-info';
 import {MODEL_CATALOG} from '../data/models';
 import {DeviceTier, ModelInfo, ModelTier} from '../types';
+import {getJSON, setJSON, KEYS} from '../storage/asyncStore';
 
 const GB = 1024 * 1024 * 1024;
 
@@ -112,4 +113,16 @@ export async function analyzeDevice(): Promise<DeviceTier> {
     freeStorageGB,
     recommendedModelId,
   };
+}
+
+/** The one persisted analysis result -- read by the Models screen instead
+ * of ever calling analyzeDevice() itself, so a phone only gets analyzed
+ * once (right after onboarding, see App.tsx) rather than on every visit.
+ * null means "never analyzed yet" (analysis hasn't run, or failed). */
+export async function getStoredDeviceTier(): Promise<DeviceTier | null> {
+  return getJSON<DeviceTier | null>(KEYS.deviceTier, null);
+}
+
+export async function setStoredDeviceTier(tier: DeviceTier): Promise<void> {
+  await setJSON(KEYS.deviceTier, tier);
 }

@@ -1,12 +1,13 @@
 import React, {useEffect, useState} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
-import {colors, spacing, typography} from '../theme';
+import {spacing} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 import {AppScreen} from '../navigation/types';
 import {SUGGESTED_TASKS, OFFLINE_CAPABILITY_CALLOUTS} from '../data/discoverContent';
 import {getConversations} from '../storage/conversations';
 import {getPersonas} from '../storage/personas';
 import {getModelById} from '../data/models';
-import {analyzeDevice} from '../services/deviceAnalyzer';
+import {getStoredDeviceTier} from '../services/deviceAnalyzer';
 import {Persona, DeviceTier} from '../types';
 import {AIPalScaffold} from '../components/AIPalScaffold';
 import {PromptSuggestion} from '../components/PromptSuggestion';
@@ -17,6 +18,7 @@ import {Card} from '../components/Card';
 type Props = {onNavigate: (screen: AppScreen) => void};
 
 export function DiscoverTabScreen({onNavigate}: Props) {
+  const {colors, typography} = useTheme();
   const [recentPersonas, setRecentPersonas] = useState<Persona[]>([]);
   const [device, setDevice] = useState<DeviceTier | null>(null);
 
@@ -46,7 +48,9 @@ export function DiscoverTabScreen({onNavigate}: Props) {
       }
       setRecentPersonas(ordered);
     })();
-    analyzeDevice().then(setDevice).catch(() => undefined);
+    // Reads the one persisted analysis result (see App.tsx) rather than
+    // ever re-analyzing itself -- device analysis runs once, ever.
+    getStoredDeviceTier().then(setDevice).catch(() => undefined);
   }, []);
 
   const recommendedModel = device ? getModelById(device.recommendedModelId) : undefined;
@@ -54,10 +58,12 @@ export function DiscoverTabScreen({onNavigate}: Props) {
   return (
     <AIPalScaffold scroll onBack={() => onNavigate({name: 'chat'})}>
       <Text style={typography.title}>Discover</Text>
-      <Text style={styles.subtitle}>Ideas for what to try next.</Text>
+      <Text style={[typography.caption, styles.subtitle]}>Ideas for what to try next.</Text>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Suggested tasks</Text>
+        <Text style={[typography.heading, styles.sectionTitle, {color: colors.textSecondary}]}>
+          Suggested tasks
+        </Text>
         {SUGGESTED_TASKS.map(task => (
           <PromptSuggestion
             key={task.label}
@@ -76,7 +82,9 @@ export function DiscoverTabScreen({onNavigate}: Props) {
 
       {recentPersonas.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recently used AIPals</Text>
+          <Text style={[typography.heading, styles.sectionTitle, {color: colors.textSecondary}]}>
+            Recently used AIPals
+          </Text>
           {recentPersonas.map(persona => (
             <AIPalCard
               key={persona.id}
@@ -89,7 +97,9 @@ export function DiscoverTabScreen({onNavigate}: Props) {
 
       {recommendedModel && device && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recommended model</Text>
+          <Text style={[typography.heading, styles.sectionTitle, {color: colors.textSecondary}]}>
+            Recommended model
+          </Text>
           <ModelCard
             model={recommendedModel}
             device={device}
@@ -103,13 +113,15 @@ export function DiscoverTabScreen({onNavigate}: Props) {
       )}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Offline AI capabilities</Text>
+        <Text style={[typography.heading, styles.sectionTitle, {color: colors.textSecondary}]}>
+          Offline AI capabilities
+        </Text>
         {OFFLINE_CAPABILITY_CALLOUTS.map(callout => (
           <Card key={callout.title} style={styles.calloutCard}>
-            <Text style={styles.calloutTitle}>
+            <Text style={[typography.body, styles.calloutTitle]}>
               {callout.emoji} {callout.title}
             </Text>
-            <Text style={styles.calloutBody}>{callout.body}</Text>
+            <Text style={[typography.caption, styles.calloutBody]}>{callout.body}</Text>
           </Card>
         ))}
       </View>
@@ -118,17 +130,15 @@ export function DiscoverTabScreen({onNavigate}: Props) {
 }
 
 const styles = StyleSheet.create({
-  subtitle: {...typography.caption, marginTop: spacing.xs, marginBottom: spacing.md},
+  subtitle: {marginTop: spacing.xs, marginBottom: spacing.md},
   section: {marginBottom: spacing.lg},
   sectionTitle: {
-    ...typography.heading,
     marginBottom: spacing.sm,
-    color: colors.textSecondary,
     textTransform: 'uppercase',
     fontSize: 13,
     letterSpacing: 0.5,
   },
   calloutCard: {marginBottom: spacing.sm},
-  calloutTitle: {...typography.body, fontWeight: '700', marginBottom: 4},
-  calloutBody: {...typography.caption, lineHeight: 19},
+  calloutTitle: {fontWeight: '700', marginBottom: 4},
+  calloutBody: {lineHeight: 19},
 });

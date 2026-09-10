@@ -9,7 +9,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {colors, spacing, typography} from '../theme';
+import {spacing} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 import {TRANSLATION_MODEL_CATALOG} from '../data/translationModels';
 import {DownloadedTranslationModel} from '../types';
 import {
@@ -31,6 +32,7 @@ const MODEL = TRANSLATION_MODEL_CATALOG[0];
 type Direction = 'en->sw' | 'sw->en';
 
 export function TranslationTestScreen({onBack}: {onBack: () => void}) {
+  const {colors, typography} = useTheme();
   const [downloaded, setDownloaded] = useState<DownloadedTranslationModel | null>(
     null,
   );
@@ -121,10 +123,10 @@ export function TranslationTestScreen({onBack}: {onBack: () => void}) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>‹ Models</Text>
+          <Text style={[styles.backText, {color: colors.accent}]}>‹ Models</Text>
         </TouchableOpacity>
         <Text style={typography.heading}>Translation Test (Dev)</Text>
         <View style={styles.backButton} />
@@ -141,7 +143,7 @@ export function TranslationTestScreen({onBack}: {onBack: () => void}) {
           {progress !== null ? (
             <View style={styles.progressRow}>
               <ProgressBar fraction={progress} />
-              <Text style={styles.progressLabel}>
+              <Text style={[typography.small, styles.progressLabel]}>
                 {Math.round(progress * 100)}%
               </Text>
             </View>
@@ -173,17 +175,19 @@ export function TranslationTestScreen({onBack}: {onBack: () => void}) {
                 onPress={() => setDirection('en->sw')}
                 style={[
                   styles.dirButton,
-                  direction === 'en->sw' && styles.dirButtonActive,
+                  {borderColor: colors.border},
+                  direction === 'en->sw' && {borderColor: colors.accent, backgroundColor: colors.accentMuted},
                 ]}>
-                <Text style={styles.dirLabel}>English → Swahili</Text>
+                <Text style={[styles.dirLabel, {color: colors.textPrimary}]}>English → Swahili</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setDirection('sw->en')}
                 style={[
                   styles.dirButton,
-                  direction === 'sw->en' && styles.dirButtonActive,
+                  {borderColor: colors.border},
+                  direction === 'sw->en' && {borderColor: colors.accent, backgroundColor: colors.accentMuted},
                 ]}>
-                <Text style={styles.dirLabel}>Swahili → English</Text>
+                <Text style={[styles.dirLabel, {color: colors.textPrimary}]}>Swahili → English</Text>
               </TouchableOpacity>
             </View>
 
@@ -192,7 +196,10 @@ export function TranslationTestScreen({onBack}: {onBack: () => void}) {
               onChangeText={setInput}
               placeholder="Text to translate..."
               placeholderTextColor={colors.textMuted}
-              style={styles.input}
+              style={[
+                styles.input,
+                {backgroundColor: colors.surfaceRaised, color: colors.textPrimary, borderColor: colors.border},
+              ]}
               multiline
             />
 
@@ -203,11 +210,15 @@ export function TranslationTestScreen({onBack}: {onBack: () => void}) {
               style={styles.translateButton}
             />
 
-            {status ? <Text style={styles.status}>{status}</Text> : null}
+            {status ? <Text style={[typography.caption, styles.status]}>{status}</Text> : null}
 
             {output ? (
-              <View style={styles.outputBox}>
-                <Text style={styles.outputText}>{output}</Text>
+              <View
+                style={[
+                  styles.outputBox,
+                  {backgroundColor: colors.surfaceRaised, borderColor: colors.border},
+                ]}>
+                <Text style={[styles.outputText, {color: colors.textPrimary}]}>{output}</Text>
               </View>
             ) : null}
           </Card>
@@ -218,7 +229,7 @@ export function TranslationTestScreen({onBack}: {onBack: () => void}) {
 }
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: colors.background},
+  container: {flex: 1},
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -227,12 +238,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   backButton: {minWidth: 70},
-  backText: {color: colors.accent, fontSize: 15, fontWeight: '600'},
+  backText: {fontSize: 15, fontWeight: '600'},
   content: {padding: spacing.md, paddingBottom: spacing.xl * 2},
   card: {marginBottom: spacing.md},
   chipRow: {flexDirection: 'row', gap: spacing.xs, marginVertical: spacing.sm},
   progressRow: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm},
-  progressLabel: {...typography.small, width: 36},
+  progressLabel: {width: 36},
   actionRow: {flexDirection: 'row', gap: spacing.sm},
   flexButton: {flex: 1},
   inlineButton: {paddingHorizontal: spacing.md},
@@ -241,30 +252,23 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: colors.border,
     alignItems: 'center',
   },
-  dirButtonActive: {borderColor: colors.accent, backgroundColor: colors.accentMuted},
-  dirLabel: {color: colors.textPrimary, fontSize: 13, fontWeight: '600'},
+  dirLabel: {fontSize: 13, fontWeight: '600'},
   input: {
-    backgroundColor: colors.surfaceRaised,
-    color: colors.textPrimary,
     borderRadius: 10,
     padding: spacing.sm,
     minHeight: 60,
     marginBottom: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.border,
   },
   translateButton: {marginTop: spacing.xs},
-  status: {...typography.caption, textAlign: 'center', marginTop: spacing.sm},
+  status: {textAlign: 'center', marginTop: spacing.sm},
   outputBox: {
     marginTop: spacing.md,
     padding: spacing.sm,
-    backgroundColor: colors.surfaceRaised,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: colors.border,
   },
-  outputText: {color: colors.textPrimary, fontSize: 15, lineHeight: 21},
+  outputText: {fontSize: 15, lineHeight: 21},
 });

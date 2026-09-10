@@ -9,6 +9,8 @@ const KEYS = {
   personas: 'pocketpal:personas',
   appSettings: 'pocketpal:app_settings',
   benchmarkRuns: 'pocketpal:benchmark_runs',
+  downloadQueue: 'pocketpal:download_queue',
+  deviceTier: 'pocketpal:device_tier',
 };
 
 export {KEYS};

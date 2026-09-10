@@ -156,9 +156,9 @@ export function ChatTabScreen({
     return (
       <AIPalScaffold>
         <EmptyState
-          icon="💬"
-          title="No conversations yet"
-          body="Download a model to start chatting."
+          useAppIcon
+          title="No Models Available"
+          body="Download a model to chat."
           actionLabel="Browse Models"
           onAction={() => onNavigate({name: 'models'})}
         />
@@ -166,7 +166,6 @@ export function ChatTabScreen({
           visible={drawerOpen}
           onClose={() => setDrawerOpen(false)}
           onOpenConversation={handleOpenConversation}
-          onNavigate={onNavigate}
         />
       </AIPalScaffold>
     );
@@ -188,7 +187,6 @@ export function ChatTabScreen({
         visible={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onOpenConversation={handleOpenConversation}
-        onNavigate={onNavigate}
       />
     </>
   );

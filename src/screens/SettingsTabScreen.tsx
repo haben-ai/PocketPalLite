@@ -422,6 +422,19 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
       <SettingSection title={t('settings.modelLoadingSettings')}>
         <SettingRow
           bare
+          label={t('settings.gpuAcceleration')}
+          description={t('settings.gpuAccelerationDescription')}
+          control={
+            <Switch
+              value={settings.gpuOffloadEnabled}
+              onValueChange={v => patch({gpuOffloadEnabled: v})}
+              trackColor={{false: colors.surfaceContainerHigh, true: colors.accent}}
+              thumbColor={colors.textPrimary}
+            />
+          }
+        />
+        <SettingRow
+          bare
           label={t('settings.autoOffload')}
           description="Offload model when app is in background."
           control={

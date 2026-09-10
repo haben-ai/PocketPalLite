@@ -1,22 +1,28 @@
 import React, {useEffect, useState} from 'react';
-import {BackHandler} from 'react-native';
+import {BackHandler, View} from 'react-native';
+import {useTheme} from '../theme/ThemeContext';
 import {AppScreen} from './types';
 import {ChatTabScreen} from '../screens/ChatTabScreen';
 import {ModelsTabScreen} from '../screens/ModelsTabScreen';
 import {AIPalsTabScreen} from '../screens/AIPalsTabScreen';
+import {MoreScreen} from '../screens/MoreScreen';
 import {DiscoverTabScreen} from '../screens/DiscoverTabScreen';
 import {SettingsTabScreen} from '../screens/SettingsTabScreen';
 import {BenchmarkScreen} from '../screens/BenchmarkScreen';
 import {AppInfoScreen} from '../screens/AppInfoScreen';
+import {OpenSourceLicensesScreen} from '../screens/OpenSourceLicensesScreen';
+import {BottomTabBar} from '../components/BottomTabBar';
 
 /**
- * ChatGPT-style shell: Chat is the sole default surface, reached directly
- * on launch with no tab bar. Every other screen (Models/AIPals/Discover/
- * Settings/Benchmark/App Info) is reached only via the hamburger sidebar
- * and fully replaces the screen below it -- no persistent chrome, no
- * bottom navigation.
+ * A persistent bottom tab bar (Chat/Models/New Chat/AIPals/More) sits below
+ * whichever screen is current, as a flex sibling rather than an overlay --
+ * every screen (including Chat's own keyboard-avoiding composer) just gets
+ * less total height to lay out in, no per-screen bottom padding needed to
+ * avoid being covered. "More" covers Discover/Benchmark/Settings/App Info,
+ * which don't get their own tab slot.
  */
 export function RootNavigator() {
+  const {colors} = useTheme();
   const [screen, setScreen] = useState<AppScreen>({name: 'chat'});
 
   // Without this, Android's hardware back button has no in-app screen
@@ -35,27 +41,35 @@ export function RootNavigator() {
     return () => subscription.remove();
   }, [screen.name]);
 
+  let content: React.ReactNode;
   switch (screen.name) {
     case 'models':
-      return (
-        <ModelsTabScreen
-          highlightModelId={screen.highlightModelId}
-          onNavigate={setScreen}
-        />
-      );
+      content = <ModelsTabScreen highlightModelId={screen.highlightModelId} onNavigate={setScreen} />;
+      break;
     case 'aipals':
-      return <AIPalsTabScreen onNavigate={setScreen} />;
+      content = <AIPalsTabScreen onNavigate={setScreen} />;
+      break;
+    case 'more':
+      content = <MoreScreen onNavigate={setScreen} />;
+      break;
     case 'discover':
-      return <DiscoverTabScreen onNavigate={setScreen} />;
+      content = <DiscoverTabScreen onNavigate={setScreen} />;
+      break;
     case 'settings':
-      return <SettingsTabScreen onNavigate={setScreen} />;
+      content = <SettingsTabScreen onNavigate={setScreen} />;
+      break;
     case 'benchmark':
-      return <BenchmarkScreen onNavigate={setScreen} />;
+      content = <BenchmarkScreen onNavigate={setScreen} />;
+      break;
     case 'appInfo':
-      return <AppInfoScreen onNavigate={setScreen} />;
+      content = <AppInfoScreen onNavigate={setScreen} />;
+      break;
+    case 'openSourceLicenses':
+      content = <OpenSourceLicensesScreen onNavigate={setScreen} />;
+      break;
     case 'chat':
     default:
-      return (
+      content = (
         <ChatTabScreen
           modelId={screen.modelId}
           conversationId={screen.conversationId}
@@ -64,5 +78,13 @@ export function RootNavigator() {
           onNavigate={setScreen}
         />
       );
+      break;
   }
+
+  return (
+    <View style={{flex: 1, backgroundColor: colors.background}}>
+      <View style={{flex: 1}}>{content}</View>
+      <BottomTabBar current={screen.name} onNavigate={setScreen} />
+    </View>
+  );
 }

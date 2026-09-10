@@ -41,6 +41,7 @@ jest.mock('react-native-fs', () => ({
   copyFile: jest.fn(() => Promise.resolve()),
   stat: jest.fn(() => Promise.resolve({size: 0})),
   readFile: jest.fn(() => Promise.resolve('')),
+  hash: jest.fn(() => Promise.resolve('')),
 }));
 
 // react-native-device-info's native module isn't available under Jest

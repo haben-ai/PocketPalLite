@@ -138,8 +138,7 @@ describe('truncateMessagesToContext', () => {
     for (let i = 0; i < 20; i++) {
       messages.push(makeMessage(`msg-${i}`, filler));
     }
-    const systemPrompt =
-      'You are Riya, an AI assistant created by MustaAI. '.repeat(3);
+    const systemPrompt = 'You are a helpful, honest AI assistant. '.repeat(3);
     const reservedTokens = estimateTextTokens(systemPrompt);
 
     const withoutReserve = truncateMessagesToContext(messages, DEFAULT_CONTEXT_SIZE);

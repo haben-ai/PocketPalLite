@@ -1,16 +1,25 @@
-import React, {useState} from 'react';
-import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import React, {useEffect, useRef, useState} from 'react';
+import {Animated, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {radius, spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
-import {DeviceTier, DownloadedModel, ModelCapability, ModelTier} from '../types';
+import {DeviceTier, DownloadedModel, ModelCapability, ModelTier, ModelVendor} from '../types';
 import {getModelCompatibility, estimatePerformance} from '../services/deviceAnalyzer';
 import {Card} from './Card';
 import {Chip, CapabilityBadge} from './Badge';
 import {PrimaryButton} from './PrimaryButton';
 import {ModelCompatibilityBadge} from './ModelCompatibilityBadge';
 import {NeuralDownloadProgress} from './NeuralDownloadProgress';
-import {GearIcon, OffloadIcon, CloseIcon, TrashIcon} from './Icons';
+import {
+  ChevronDownIcon,
+  DownloadIcon,
+  OffloadIcon,
+  CloseIcon,
+  TrashIcon,
+  VisionIcon,
+} from './Icons';
+import {VendorLogo} from './VendorLogo';
 import {BlinkingDot} from './BlinkingDot';
+import {QueueItemStatus} from '../services/downloadQueue';
 
 /** Normalized shape ModelCard renders -- satisfied structurally by
  * ModelInfo (catalog models) and by a lightweight object built from
@@ -27,6 +36,7 @@ export type ModelRowInfo = {
   params?: string;
   quant?: string;
   minRamGB?: number;
+  vendor?: ModelVendor;
 };
 
 function formatSize(bytes: number): string {
@@ -66,7 +76,14 @@ export function ModelCard({
 }: {
   model: ModelRowInfo;
   downloadedEntry?: DownloadedModel;
-  downloadState?: {fraction: number; cancel: () => void};
+  downloadState?: {
+    fraction: number;
+    status: QueueItemStatus;
+    queuePosition?: number;
+    error?: string;
+    cancel: () => void;
+    retry?: () => void;
+  };
   device?: DeviceTier;
   highlighted?: boolean;
   /** True when this is the model currently loaded into the llama.rn
@@ -83,6 +100,15 @@ export function ModelCard({
 }) {
   const {colors, typography} = useTheme();
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const chevronRotation = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(chevronRotation, {
+      toValue: detailsOpen ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [detailsOpen, chevronRotation]);
 
   const compatibility =
     device && model.minRamGB !== undefined
@@ -98,18 +124,37 @@ export function ModelCard({
     <Card
       style={[styles.card, isActive && {borderColor: colors.success}]}
       highlighted={highlighted}>
-      <View style={styles.headerRow}>
-        <Text style={styles.typeIcon}>{model.capability === 'vision' ? '👁' : '💬'}</Text>
+      <TouchableOpacity
+        style={styles.headerRow}
+        onPress={() => setDetailsOpen(v => !v)}
+        activeOpacity={model.description || compatibility || model.params ? 0.7 : 1}>
+        <View style={[styles.avatarBadge, {backgroundColor: colors.surfaceContainerHigh}]}>
+          <VendorLogo vendor={model.vendor} size={20} mutedColor={colors.textSecondary} />
+          {model.capability === 'vision' && (
+            <View style={[styles.visionBadge, {backgroundColor: colors.accent, borderColor: colors.surface}]}>
+              <VisionIcon size={10} color={colors.surface} />
+            </View>
+          )}
+        </View>
         <Text style={[typography.heading, styles.name]} numberOfLines={1}>
           {model.name}
         </Text>
         <Text style={[typography.small, {color: colors.textMuted}]}>{formatSize(model.sizeBytes)}</Text>
         {downloadedEntry && <BlinkingDot color={isActive ? colors.success : colors.danger} />}
-      </View>
-
-      {model.description && (
-        <Text style={[typography.caption, styles.description]}>{model.description}</Text>
-      )}
+        <Animated.View
+          style={{
+            transform: [
+              {
+                rotate: chevronRotation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0deg', '180deg'],
+                }),
+              },
+            ],
+          }}>
+          <ChevronDownIcon size={18} color={colors.textSecondary} />
+        </Animated.View>
+      </TouchableOpacity>
 
       {storageLow && (
         <Text style={[typography.small, styles.storageWarning, {color: colors.danger}]}>
@@ -117,19 +162,39 @@ export function ModelCard({
         </Text>
       )}
 
+      {!detailsOpen && model.description && (
+        <Text
+          style={[typography.small, styles.descriptionPreview, {color: colors.textMuted}]}
+          numberOfLines={1}>
+          {model.description}
+        </Text>
+      )}
+
       {detailsOpen && (
-        <View style={styles.detailsRow}>
-          {compatibility && <ModelCompatibilityBadge compatibility={compatibility} />}
-          {performance !== undefined && <Chip label={`⚡ ~${performance} tok/s`} />}
-          {model.capability && <CapabilityBadge capability={model.capability} compact />}
-          {model.params && <Chip label={model.params} />}
-          {model.quant && <Chip label={model.quant} />}
-          {model.minRamGB !== undefined && <Chip label={`Min ${model.minRamGB} GB RAM`} />}
+        <View style={styles.detailsSection}>
+          {model.description && (
+            <Text style={[typography.caption, styles.description]}>{model.description}</Text>
+          )}
+          <View style={styles.detailsRow}>
+            {compatibility && <ModelCompatibilityBadge compatibility={compatibility} />}
+            {performance !== undefined && <Chip label={`⚡ ~${performance} tok/s`} />}
+            {model.capability && <CapabilityBadge capability={model.capability} compact />}
+            {model.params && <Chip label={model.params} />}
+            {model.quant && <Chip label={model.quant} />}
+            {model.minRamGB !== undefined && <Chip label={`Min ${model.minRamGB} GB RAM`} />}
+          </View>
         </View>
       )}
 
       {downloadState ? (
-        <NeuralDownloadProgress fraction={downloadState.fraction} onCancel={downloadState.cancel} />
+        <NeuralDownloadProgress
+          fraction={downloadState.fraction}
+          status={downloadState.status}
+          queuePosition={downloadState.queuePosition}
+          error={downloadState.error}
+          onCancel={downloadState.cancel}
+          onRetry={downloadState.retry}
+        />
       ) : (
         <View style={styles.actionRow}>
           {downloadedEntry ? (
@@ -152,15 +217,9 @@ export function ModelCard({
               onPress={onDownload}
               disabled={storageLow}
               style={styles.flexButton}
+              icon={color => <DownloadIcon size={18} color={color} />}
             />
           )}
-
-          <TouchableOpacity
-            style={[styles.iconButton, {backgroundColor: colors.surfaceContainerHigh}]}
-            onPress={() => setDetailsOpen(v => !v)}
-            hitSlop={4}>
-            <GearIcon size={16} color={colors.textSecondary} />
-          </TouchableOpacity>
 
           {downloadedEntry ? (
             <TouchableOpacity
@@ -186,9 +245,31 @@ export function ModelCard({
 const styles = StyleSheet.create({
   card: {marginBottom: spacing.sm},
   headerRow: {flexDirection: 'row', alignItems: 'center', gap: spacing.xs},
-  typeIcon: {fontSize: 16},
+  avatarBadge: {
+    // +10% over the original 28px badge / 16px vision overlay -- a
+    // deliberate "make the model icon bigger" pass, not an arbitrary size.
+    width: 31,
+    height: 31,
+    borderRadius: 15.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'visible',
+  },
+  visionBadge: {
+    position: 'absolute',
+    right: -3,
+    bottom: -3,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   name: {flex: 1},
-  description: {marginTop: 4, lineHeight: 19},
+  descriptionPreview: {marginTop: spacing.xs},
+  detailsSection: {marginTop: spacing.xs},
+  description: {lineHeight: 19},
   storageWarning: {marginTop: spacing.xs, fontWeight: '600'},
   detailsRow: {
     flexDirection: 'row',

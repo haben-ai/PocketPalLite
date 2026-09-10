@@ -1,11 +1,12 @@
 import React, {useEffect, useState} from 'react';
-import {AppState, View} from 'react-native';
+import {AppState, PermissionsAndroid, Platform, View} from 'react-native';
 import {hasSeenOnboarding, setOnboardingSeen} from './src/storage/asyncStore';
 import {OnboardingScreen} from './src/screens/OnboardingScreen';
 import {RootNavigator} from './src/navigation/RootNavigator';
 import {ensureBuiltInPersonaSeeded} from './src/storage/personas';
-import {getAppSettings} from './src/storage/appSettings';
+import {getAppSettings, ensureNThreadsTuned} from './src/storage/appSettings';
 import {releaseActiveContext} from './src/services/llamaSession';
+import {analyzeDevice, getStoredDeviceTier, setStoredDeviceTier} from './src/services/deviceAnalyzer';
 import {ThemeProvider} from './src/theme/ThemeContext';
 import {initI18n} from './src/i18n';
 
@@ -17,12 +18,42 @@ export default function App() {
   useEffect(() => {
     (async () => {
       // Runs for both new and upgrading users -- idempotent, ensures the
-      // built-in Riya/MustaAI persona always exists before Chat can need it.
+      // built-in default persona always exists before Chat can need it.
       await ensureBuiltInPersonaSeeded();
+      // Idempotent -- raises the nThreads default to this real device's
+      // core count the first time the app ever boots (see the function's
+      // own doc comment). Runs before getAppSettings() below so Chat's
+      // first model load already sees the tuned value.
+      await ensureNThreadsTuned();
       const settings = await getAppSettings();
       initI18n(settings.language);
       const seen = await hasSeenOnboarding();
       setRoute({screen: seen ? 'app' : 'onboarding'});
+
+      // Device analysis runs exactly once, ever -- not on every visit to
+      // the Models screen. Checked here (not gated on "onboarding just
+      // finished") so it also covers users who already completed
+      // onboarding under an older build and have never had a stored
+      // result. Best-effort: a failure here just leaves the Models screen
+      // without a recommendation, nothing else depends on it.
+      if (!(await getStoredDeviceTier())) {
+        try {
+          await setStoredDeviceTier(await analyzeDevice());
+        } catch {
+          // Best-effort -- see comment above.
+        }
+      }
+
+      // Best-effort: without this (Android 13+), GenerationForegroundService
+      // can still run and protect the process while a reply generates in
+      // the background, it just won't be able to show the notification
+      // Android requires for a foreground service -- not fatal, just less
+      // visible, so a denial here doesn't need any special handling.
+      if (Platform.OS === 'android' && Platform.Version >= 33) {
+        PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+        ).catch(() => undefined);
+      }
     })();
   }, []);
 
@@ -52,7 +83,10 @@ export default function App() {
   }
 
   return (
-    <ThemeProvider systemFont="NotoSans">
+    // No systemFont override -- text renders in the platform's own default
+    // sans-serif (Roboto on Android), a real geometric/neo-grotesque
+    // typeface, instead of the previously-bundled NotoSans.
+    <ThemeProvider>
       {route.screen === 'onboarding' ? (
         <OnboardingScreen
           onDone={async () => {

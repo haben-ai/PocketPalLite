@@ -1,6 +1,5 @@
 import React, {useEffect, useRef} from 'react';
 import {Animated, Easing, StyleSheet, View} from 'react-native';
-import {colors} from '../theme';
 
 const DOT_COUNT = 8;
 const CYCLE_MS = 1000;
@@ -11,8 +10,12 @@ const CYCLE_MS = 1000;
  * ActivityIndicator) -- shown under the header while a model is loading.
  * Each dot runs its own looped opacity animation, staggered by its position
  * around the ring, so the lit dot appears to travel around the circle.
+ * `color` is required (no theme-dependent default) so every call site is
+ * forced to pass the current theme's own color, matching Icons.tsx's
+ * convention -- a hardcoded fallback could silently go stale against a
+ * theme it was never checked against.
  */
-export function DottedSpinner({size = 18, color = colors.textSecondary}: {size?: number; color?: string}) {
+export function DottedSpinner({size = 18, color}: {size?: number; color: string}) {
   const opacities = useRef(
     Array.from({length: DOT_COUNT}, () => new Animated.Value(0.2)),
   ).current;

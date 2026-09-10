@@ -8,26 +8,22 @@ import {MODEL_CATALOG, getModelById} from '../data/models';
 import {DeviceTier, DownloadedModel, ModelInfo} from '../types';
 import {
   deleteDownloadedModel,
-  downloadModel,
-  downloadRemoteModel,
-  getFreeStorageBytes,
   importLocalModel,
   migrateLegacyModelIfPresent,
 } from '../services/downloadManager';
+import * as downloadQueue from '../services/downloadQueue';
+import {QueueItem, QueueJobDescriptor} from '../services/downloadQueue';
 import {
   getDownloadedModels,
   removeDownloadedModel,
   registerDownloadedModel,
 } from '../storage/modelRegistry';
-import {analyzeDevice} from '../services/deviceAnalyzer';
+import {getStoredDeviceTier} from '../services/deviceAnalyzer';
 import {AppSettings, getAppSettings, setAppSettings} from '../storage/appSettings';
-import {getSecret, SECRET_SERVICE} from '../services/secureStorage';
 import {getActiveModelId, releaseActiveContext} from '../services/llamaSession';
 import {AIPalScaffold} from '../components/AIPalScaffold';
 import {AnalysisRevealCard} from '../components/AnalysisRevealCard';
 import {ModelCard, ModelRowInfo} from '../components/ModelCard';
-import {PrimaryButton} from '../components/PrimaryButton';
-import {LoadingState} from '../components/LoadingState';
 import {CollapsibleSection} from '../components/CollapsibleSection';
 import {ModelsFilterMenu} from '../components/ModelsFilterMenu';
 import {AddModelFab} from '../components/AddModelFab';
@@ -35,7 +31,14 @@ import {AddRemoteModelModal} from '../components/AddRemoteModelModal';
 import {HuggingFaceSearchModal} from '../components/HuggingFaceSearchModal';
 import {SlidersIcon} from '../components/Icons';
 
-type DownloadState = {fraction: number; cancel: () => void} | undefined;
+type ModelCardDownloadState = {
+  fraction: number;
+  status: QueueItem['status'];
+  queuePosition?: number;
+  error?: string;
+  cancel: () => void;
+  retry?: () => void;
+};
 
 type ReadyItem = {row: ModelRowInfo; entry: DownloadedModel};
 
@@ -55,6 +58,7 @@ function catalogToRow(model: ModelInfo): ModelRowInfo {
     params: model.params,
     quant: model.quant,
     minRamGB: model.minRamGB,
+    vendor: model.vendor,
   };
 }
 
@@ -78,8 +82,7 @@ function groupByCapability<T extends {row: ModelRowInfo}>(items: T[]): {text: T[
 export function ModelsTabScreen({highlightModelId, onNavigate}: Props) {
   const {colors, typography} = useTheme();
   const [downloaded, setDownloaded] = useState<DownloadedModel[]>([]);
-  const [downloads, setDownloads] = useState<Record<string, DownloadState>>({});
-  const [analyzing, setAnalyzing] = useState(false);
+  const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [device, setDevice] = useState<DeviceTier | null>(null);
   const [search, setSearch] = useState('');
   const [activeModelId, setActiveModelId] = useState<string | null>(null);
@@ -92,32 +95,11 @@ export function ModelsTabScreen({highlightModelId, onNavigate}: Props) {
 
   const [hfSearchOpen, setHfSearchOpen] = useState(false);
   const [remoteModalOpen, setRemoteModalOpen] = useState(false);
-  const [pendingRemote, setPendingRemote] = useState<Record<string, {name: string; sizeBytes: number}>>({});
 
   const refresh = useCallback(async () => {
     const all = await getDownloadedModels();
     setDownloaded(all);
     setActiveModelId(getActiveModelId());
-  }, []);
-
-  const handleAnalyze = useCallback(async () => {
-    setAnalyzing(true);
-    try {
-      // The real analysis (two DeviceInfo calls) resolves near-instantly --
-      // padding it to 2-3 seconds makes "Checking your phone..." read as
-      // genuine analysis happening rather than a suspiciously instant
-      // flash, without ever faking the result itself.
-      const minDuration = 2000 + Math.random() * 1000;
-      const [result] = await Promise.all([
-        analyzeDevice(),
-        new Promise(resolve => setTimeout(resolve, minDuration)),
-      ]);
-      setDevice(result);
-    } catch (err: any) {
-      Alert.alert('Could not analyze device', err.message ?? String(err));
-    } finally {
-      setAnalyzing(false);
-    }
   }, []);
 
   useEffect(() => {
@@ -132,88 +114,82 @@ export function ModelsTabScreen({highlightModelId, onNavigate}: Props) {
       setSortMode(settings.modelsSortMode);
       setGroupByType(settings.modelsGroupByType);
       await refresh();
-      // Recommended-for-your-device is a standing section now, not a
-      // button the user has to think to tap -- runs once automatically.
-      await handleAnalyze();
+      // Device analysis itself runs once, ever, right after onboarding
+      // (see App.tsx) -- this screen just reads whatever result is already
+      // stored, never re-analyzes on its own.
+      setDevice(await getStoredDeviceTier());
     })();
     // This screen fully mounts/unmounts on every sidebar navigation (no
     // persistent tab bar keeping it alive in the background any more), so
     // a mount-only effect is enough to always show fresh data.
-  }, [refresh, handleAnalyze]);
+  }, [refresh]);
 
-  const isDownloaded = (modelId: string) => downloaded.some(m => m.modelId === modelId);
-
-  const withHfHeaders = async (): Promise<Record<string, string> | undefined> => {
-    const {useHfToken} = await getAppSettings();
-    const hfToken = useHfToken ? await getSecret(SECRET_SERVICE.hfToken) : null;
-    return hfToken ? {Authorization: `Bearer ${hfToken}`} : undefined;
-  };
-
-  const runDownload = async (
-    modelId: string,
-    start: (onProgress: (fraction: number) => void) => Promise<{cancel: () => void; completion: Promise<void>}>,
-  ) => {
-    try {
-      const handle = await start(fraction => {
-        setDownloads(prev => ({...prev, [modelId]: {fraction, cancel: handle.cancel}}));
-      });
-      setDownloads(prev => ({...prev, [modelId]: {fraction: 0, cancel: handle.cancel}}));
-      await handle.completion;
-      setDownloads(prev => {
-        const next = {...prev};
-        delete next[modelId];
-        return next;
-      });
+  // The download queue (services/downloadQueue.ts) is the single source of
+  // truth for every in-flight download's progress/status -- this screen
+  // just mirrors it into state to render. onDone fires once per completed
+  // job (after it's already been registered as a usable model and removed
+  // from the queue), which is the one-shot moment to refresh the "Ready to
+  // Use" list and honor Auto-Navigate to Chat, matching the old
+  // runDownload()'s behavior on success.
+  useEffect(() => {
+    const unsubscribeChange = downloadQueue.onChange(setQueueItems);
+    const unsubscribeDone = downloadQueue.onDone(async descriptor => {
       await refresh();
       const {autoNavigateToChat} = await getAppSettings();
       if (autoNavigateToChat) {
-        openChat(modelId);
+        openChat(descriptor.modelId);
       }
+    });
+    return () => {
+      unsubscribeChange();
+      unsubscribeDone();
+    };
+  }, [refresh]);
+
+  const isDownloaded = (modelId: string) => downloaded.some(m => m.modelId === modelId);
+
+  const queuedPosition = (item: QueueItem): number | undefined =>
+    item.status === 'queued'
+      ? queueItems.filter(i => i.status === 'queued').indexOf(item) + 1
+      : undefined;
+
+  const downloadStateFor = (descriptor: QueueJobDescriptor): ModelCardDownloadState | undefined => {
+    const item = queueItems.find(
+      i => i.descriptor.kind === descriptor.kind && i.descriptor.modelId === descriptor.modelId,
+    );
+    if (!item) {
+      return undefined;
+    }
+    return {
+      fraction: item.fraction,
+      status: item.status,
+      queuePosition: queuedPosition(item),
+      error: item.error,
+      cancel: () => downloadQueue.cancel(item.descriptor),
+      retry: () => downloadQueue.retry(item.descriptor),
+    };
+  };
+
+  const handleDownload = async (model: ModelInfo) => {
+    try {
+      await downloadQueue.enqueue({kind: 'catalog', modelId: model.id});
     } catch (err: any) {
-      setDownloads(prev => {
-        const next = {...prev};
-        delete next[modelId];
-        return next;
-      });
       Alert.alert('Download failed', err.message ?? String(err));
     }
   };
 
-  const handleDownload = (model: ModelInfo) =>
-    runDownload(model.id, async onProgress => {
-      const headers = await withHfHeaders();
-      return downloadModel(model, fraction => onProgress(fraction), headers);
-    });
-
   const handleDownloadRemote = async (url: string, displayName: string, sizeHint?: number) => {
-    if (sizeHint) {
-      const freeBytes = await getFreeStorageBytes();
-      if (freeBytes < sizeHint * 1.05) {
-        Alert.alert(
-          'Not enough storage',
-          `This model needs about ${(sizeHint / 1e9).toFixed(1)} GB, but only ${(freeBytes / 1e9).toFixed(
-            1,
-          )} GB is free.`,
-        );
-        return;
-      }
-    }
-    const modelId = `remote-${Date.now()}`;
-    // A remote/HF-sourced download has no existing catalog or "downloaded"
-    // row to attach its progress to (unlike a catalog model, which already
-    // renders in "Available to Download") -- track it separately so it gets
-    // a visible card of its own for as long as it's in flight.
-    setPendingRemote(prev => ({...prev, [modelId]: {name: displayName, sizeBytes: sizeHint ?? 0}}));
-    return runDownload(modelId, async onProgress => {
-      const headers = await withHfHeaders();
-      return downloadRemoteModel(modelId, url, displayName, fraction => onProgress(fraction), headers);
-    }).finally(() => {
-      setPendingRemote(prev => {
-        const next = {...prev};
-        delete next[modelId];
-        return next;
+    try {
+      await downloadQueue.enqueue({
+        kind: 'remote',
+        modelId: `remote-${Date.now()}`,
+        url,
+        displayName,
+        sizeBytes: sizeHint ?? 0,
       });
-    });
+    } catch (err: any) {
+      Alert.alert('Download failed', err.message ?? String(err));
+    }
   };
 
   const handleSelectHfFile = ({
@@ -330,7 +306,15 @@ export function ModelsTabScreen({highlightModelId, onNavigate}: Props) {
     return sortRows(items, sortMode);
   }, [downloaded, query, sortMode]);
 
-  const pendingRemoteEntries = Object.entries(pendingRemote);
+  // Remote/HF-sourced downloads have no existing catalog or "downloaded"
+  // row to attach their progress to (unlike a catalog model, which already
+  // renders in "Available to Download") -- the queue's own descriptor
+  // carries enough (displayName/sizeBytes) to render a placeholder card of
+  // its own for as long as it's in flight.
+  const pendingRemoteItems = queueItems.filter(
+    (i): i is QueueItem & {descriptor: Extract<QueueJobDescriptor, {kind: 'remote'}>} =>
+      i.descriptor.kind === 'remote',
+  );
 
   const availableItems = useMemo(() => {
     const items = MODEL_CATALOG.filter(
@@ -347,7 +331,7 @@ export function ModelsTabScreen({highlightModelId, onNavigate}: Props) {
       key={item.entry.modelId}
       model={item.row}
       downloadedEntry={item.entry}
-      downloadState={downloads[item.entry.modelId]}
+      downloadState={downloadStateFor({kind: 'catalog', modelId: item.entry.modelId})}
       device={device ?? undefined}
       highlighted={highlightModelId === item.entry.modelId}
       isActive={activeModelId === item.entry.modelId}
@@ -362,7 +346,7 @@ export function ModelsTabScreen({highlightModelId, onNavigate}: Props) {
     <ModelCard
       key={item.model.id}
       model={item.row}
-      downloadState={downloads[item.model.id]}
+      downloadState={downloadStateFor({kind: 'catalog', modelId: item.model.id})}
       device={device ?? undefined}
       highlighted={highlightModelId === item.model.id}
       onDownload={() => handleDownload(item.model)}
@@ -400,18 +384,16 @@ export function ModelsTabScreen({highlightModelId, onNavigate}: Props) {
         ]}
       />
 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, {color: colors.textSecondary}]}>
-          Recommended for your device
-        </Text>
-        {analyzing ? (
-          <LoadingState label="Checking your phone..." />
-        ) : recommendedModel ? (
+      {recommendedModel && (
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, {color: colors.textSecondary}]}>
+            Recommended for your device
+          </Text>
           <AnalysisRevealCard revealKey={recommendedModel.id}>
             <ModelCard
               model={catalogToRow(recommendedModel)}
               downloadedEntry={downloaded.find(m => m.modelId === recommendedModel.id)}
-              downloadState={downloads[recommendedModel.id]}
+              downloadState={downloadStateFor({kind: 'catalog', modelId: recommendedModel.id})}
               device={device ?? undefined}
               highlighted
               isActive={activeModelId === recommendedModel.id}
@@ -426,32 +408,29 @@ export function ModelsTabScreen({highlightModelId, onNavigate}: Props) {
               }}
             />
           </AnalysisRevealCard>
-        ) : null}
-        <PrimaryButton
-          label="Re-analyze my phone"
-          variant="secondary"
-          onPress={handleAnalyze}
-          loading={analyzing}
-          style={styles.reanalyzeButton}
-        />
-      </View>
+        </View>
+      )}
 
       {showReady && (
         <CollapsibleSection
           title="Ready to Use"
-          count={readyItems.length + pendingRemoteEntries.length}
+          count={readyItems.length + pendingRemoteItems.length}
           defaultOpen>
-          {pendingRemoteEntries.map(([id, pending]) => (
+          {pendingRemoteItems.map(item => (
             <ModelCard
-              key={id}
-              model={{id, name: pending.name, sizeBytes: pending.sizeBytes}}
-              downloadState={downloads[id]}
+              key={item.descriptor.modelId}
+              model={{
+                id: item.descriptor.modelId,
+                name: item.descriptor.displayName,
+                sizeBytes: item.descriptor.sizeBytes,
+              }}
+              downloadState={downloadStateFor(item.descriptor)}
               onDownload={() => undefined}
               onChat={() => undefined}
               onDelete={() => undefined}
             />
           ))}
-          {readyItems.length === 0 && pendingRemoteEntries.length === 0 ? (
+          {readyItems.length === 0 && pendingRemoteItems.length === 0 ? (
             <Text style={[typography.caption, styles.emptyText]}>
               Nothing downloaded yet -- pick a model below, or tap + to add one.
             </Text>
@@ -588,7 +567,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.5,
   },
-  reanalyzeButton: {marginTop: spacing.xs},
   emptyText: {paddingVertical: spacing.sm},
   groupLabel: {marginTop: spacing.xs, marginBottom: 4, letterSpacing: 0.5},
   spacerForFab: {height: 72},

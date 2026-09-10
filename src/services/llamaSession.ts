@@ -19,6 +19,7 @@ export type ContextInitOptions = {
   flashAttnType?: 'auto' | 'on' | 'off';
   cacheTypeK?: CacheType;
   cacheTypeV?: CacheType;
+  gpuOffloadEnabled?: boolean;
 };
 
 async function getOrInitContext(
@@ -57,6 +58,7 @@ async function getOrInitContext(
     flashAttnType = 'auto',
     cacheTypeK = 'f16',
     cacheTypeV = 'f16',
+    gpuOffloadEnabled = true,
   } = initOptions;
 
   activeInit = (async () => {
@@ -65,10 +67,15 @@ async function getOrInitContext(
         model: filePath,
         n_ctx: contextSize,
         n_threads: nThreads,
-        // GPU offload (n_gpu_layers) is iOS-only in this llama.rn binding --
-        // deliberately left at 0 rather than exposed as a togglable setting
-        // on Android, where it would silently do nothing.
-        n_gpu_layers: 0,
+        // llama.rn auto-selects an OpenCL-accelerated native library on
+        // Adreno-GPU Android devices (see LlamaContext.java's static
+        // loadLibrary block), and n_gpu_layers is genuinely wired through
+        // to llama.cpp on Android (jni.cpp reads it from the JS params) --
+        // not iOS-only. 99 requests "offload every layer that fits"; on a
+        // device/model where no GPU backend is available or engaged,
+        // llama.cpp silently falls back to CPU, so this is safe to always
+        // request rather than needing per-device detection here.
+        n_gpu_layers: gpuOffloadEnabled ? 99 : 0,
         use_mlock: useMlock,
         use_mmap: useMmap,
         n_batch: nBatch,

@@ -16,12 +16,17 @@ export const lightColors = {
   outlineVariant: '#E5E5E7',
   border: '#D9D9DC',
 
-  textPrimary: '#1A1A1A',
+  // Pure black, not a near-black gray -- explicitly requested for light
+  // mode's body text (the near-black #1A1A1A this used to be is why light
+  // mode read as slightly washed-out).
+  textPrimary: '#000000',
   textSecondary: '#5A5A5F',
   textMuted: '#8E8E93',
 
-  accent: '#111111',
-  accentMuted: '#0000001A',
+  // Brand blue (matches the app icon's gradient) -- replaces the old
+  // plain black/white inversion now that the app has a real brand color.
+  accent: '#2F6FED',
+  accentMuted: '#2F6FED1F',
   onAccent: '#FFFFFF',
 
   userBubble: '#EDEDEF',

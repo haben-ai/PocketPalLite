@@ -1,13 +1,15 @@
 import React, {useEffect, useState} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import DeviceInfo from 'react-native-device-info';
-import {radius, spacing} from '../theme';
+import {spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
 import {AppScreen} from '../navigation/types';
 import {AIPalScaffold} from '../components/AIPalScaffold';
 import {SettingSection} from '../components/SettingSection';
 import {SettingRow} from '../components/SettingRow';
+import {PrimaryButton} from '../components/PrimaryButton';
 import {Card} from '../components/Card';
+import {AppIconMark} from '../components/AppIconMark';
 import packageJson from '../../package.json';
 
 type DeviceIds = {
@@ -46,8 +48,8 @@ export function AppInfoScreen({onNavigate}: {onNavigate: (screen: AppScreen) => 
   return (
     <AIPalScaffold scroll onBack={() => onNavigate({name: 'chat'})}>
       <View style={styles.hero}>
-        <View style={[styles.iconTile, {backgroundColor: colors.surfaceContainerHigh}]}>
-          <Text style={styles.iconGlyph}>🐾</Text>
+        <View style={styles.iconWrap}>
+          <AppIconMark size={72} />
         </View>
         <Text style={[typography.title, styles.appName]}>{appName}</Text>
         <Text style={[typography.caption, styles.tagline]}>
@@ -116,6 +118,21 @@ export function AppInfoScreen({onNavigate}: {onNavigate: (screen: AppScreen) => 
         />
       </SettingSection>
 
+      <SettingSection title="Legal">
+        <SettingRow
+          bare
+          label="Open Source Licenses"
+          description="Every third-party package this app is built with, and its license."
+          control={
+            <PrimaryButton
+              label="View"
+              variant="secondary"
+              onPress={() => onNavigate({name: 'openSourceLicenses'})}
+            />
+          }
+        />
+      </SettingSection>
+
       <Card style={styles.footerCard}>
         <Text style={[typography.caption, styles.footerText]}>
           Model weights are downloaded from their original publishers (e.g. Hugging Face) and run
@@ -128,15 +145,7 @@ export function AppInfoScreen({onNavigate}: {onNavigate: (screen: AppScreen) => 
 
 const styles = StyleSheet.create({
   hero: {alignItems: 'center', marginBottom: spacing.lg, marginTop: spacing.sm},
-  iconTile: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  iconGlyph: {fontSize: 34},
+  iconWrap: {marginBottom: spacing.sm},
   appName: {textAlign: 'center'},
   tagline: {textAlign: 'center', marginTop: 4},
   footerCard: {marginTop: spacing.xs, marginBottom: spacing.xl},

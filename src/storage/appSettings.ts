@@ -1,4 +1,5 @@
 import {getJSON, setJSON, KEYS} from './asyncStore';
+import {getCpuCoreCount} from '../services/deviceCores';
 
 /** 0 = Off, 1 = Mirostat v1, 2 = Mirostat v2 -- matches llama.cpp's own encoding. */
 export type MirostatMode = 0 | 1 | 2;
@@ -37,6 +38,13 @@ export type AppSettings = {
   autoNavigateToChat: boolean;
   /** Release the active llama context when the app is backgrounded. */
   autoOffload: boolean;
+  /** Offload model layers to the device GPU (via llama.rn's Android OpenCL
+   * backend, auto-selected at the native-library level on Adreno devices)
+   * instead of running CPU-only. Defaults on -- a no-op on devices without
+   * a supported GPU backend, since llama.cpp falls back to CPU silently
+   * when no GPU backend is compiled into the loaded native library.
+   * Applies next model load. */
+  gpuOffloadEnabled: boolean;
 
   /** 'system' follows the OS light/dark setting. */
   themeMode: 'light' | 'dark' | 'system';
@@ -120,6 +128,7 @@ const DEFAULTS: AppSettings = {
   useMmap: true,
   autoNavigateToChat: false,
   autoOffload: false,
+  gpuOffloadEnabled: true,
   themeMode: 'system',
   nBatch: 512,
   nUbatch: 512,
@@ -159,4 +168,30 @@ export async function resetAppSettingsToDefaults(): Promise<AppSettings> {
 /** The n_predict value to actually send to the engine for the current mode. */
 export function resolveNPredict(settings: AppSettings): number {
   return settings.nPredictMode === 'unlimited' ? -1 : settings.maxTokens;
+}
+
+/**
+ * Idempotent boot-time migration (mirrors storage/personas.ts's
+ * ensureBuiltInPersonaSeeded pattern): the static nThreads default above
+ * (4) is a safe lowest-common-denominator fallback, not a real per-device
+ * choice -- this device's own Benchmark screen reports 8 real cores
+ * (via getCpuCoreCount(), the same native Runtime.availableProcessors()
+ * reading), and generation was measurably slower than it needs to be
+ * because of it. Runs once: if nThreads has never been explicitly
+ * persisted (the user hasn't touched it, and this migration hasn't run
+ * before), sets it to cores-1 -- leaving one core for the OS/UI thread is
+ * standard llama.cpp guidance and avoids contending with the thread
+ * actually driving the app. Never overwrites a value the user (or a prior
+ * run of this same migration) already set.
+ */
+export async function ensureNThreadsTuned(): Promise<void> {
+  const stored = await getJSON<Partial<AppSettings>>(KEYS.appSettings, {});
+  if (stored.nThreads !== undefined) {
+    return;
+  }
+  const cores = await getCpuCoreCount();
+  if (!cores || cores <= 1) {
+    return;
+  }
+  await setJSON(KEYS.appSettings, {...stored, nThreads: Math.max(1, cores - 1)});
 }

@@ -1,7 +1,8 @@
 import React, {useState} from 'react';
 import {Alert, Modal, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {pick, isErrorWithCode, errorCodes} from '@react-native-documents/picker';
-import {colors, radius, spacing, typography} from '../theme';
+import {radius, spacing} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 import {Conversation} from '../types';
 import {exportConversation, importConversationFromUri} from '../services/conversationExport';
 
@@ -17,6 +18,7 @@ export function ExportImportSheet({
   /** Called with the id of the newly-created imported conversation. */
   onImported: (conversationId: string) => void;
 }) {
+  const {colors, typography} = useTheme();
   const [busy, setBusy] = useState(false);
 
   const handleExport = async () => {
@@ -58,20 +60,29 @@ export function ExportImportSheet({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose}>
-        <View style={styles.sheet}>
+        <View
+          style={[
+            styles.sheet,
+            {backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant},
+          ]}>
           <Text style={typography.heading}>Export / Import</Text>
 
           <TouchableOpacity
-            style={styles.row}
+            style={[styles.row, {backgroundColor: colors.surfaceContainer}]}
             disabled={busy || !conversation}
             onPress={handleExport}>
-            <Text style={styles.rowTitle}>Export this conversation</Text>
-            <Text style={styles.rowHint}>Share the current chat as a JSON file.</Text>
+            <Text style={[typography.body, styles.rowTitle]}>Export this conversation</Text>
+            <Text style={[typography.caption, styles.rowHint]}>
+              Share the current chat as a JSON file.
+            </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.row} disabled={busy} onPress={handleImport}>
-            <Text style={styles.rowTitle}>Import conversation from file</Text>
-            <Text style={styles.rowHint}>
+          <TouchableOpacity
+            style={[styles.row, {backgroundColor: colors.surfaceContainer}]}
+            disabled={busy}
+            onPress={handleImport}>
+            <Text style={[typography.body, styles.rowTitle]}>Import conversation from file</Text>
+            <Text style={[typography.caption, styles.rowHint]}>
               Load a previously exported .json file as a new chat.
             </Text>
           </TouchableOpacity>
@@ -88,20 +99,17 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: colors.surfaceContainerLow,
     borderTopLeftRadius: radius.lg,
     borderTopRightRadius: radius.lg,
     padding: spacing.md,
     paddingBottom: spacing.xl,
     borderTopWidth: 1,
-    borderColor: colors.outlineVariant,
   },
   row: {
     marginTop: spacing.md,
     padding: spacing.md,
     borderRadius: radius.md,
-    backgroundColor: colors.surfaceContainer,
   },
-  rowTitle: {...typography.body, fontWeight: '600'},
-  rowHint: {...typography.caption, marginTop: 4},
+  rowTitle: {fontWeight: '600'},
+  rowHint: {marginTop: 4},
 });

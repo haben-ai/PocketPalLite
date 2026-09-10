@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {Alert, StyleSheet, Text} from 'react-native';
-import {spacing, typography} from '../theme';
+import {spacing} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 import {Persona} from '../types';
 import {getPersonas, createPersona, updatePersona, deletePersona} from '../storage/personas';
 import {getDownloadedModels} from '../storage/modelRegistry';
@@ -15,6 +16,7 @@ import {DownloadedModel} from '../types';
 type SubView = {mode: 'list'} | {mode: 'edit'; personaId: string | null};
 
 export function AIPalsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen) => void}) {
+  const {typography} = useTheme();
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [downloadedModels, setDownloadedModels] = useState<DownloadedModel[]>([]);
   const [subView, setSubView] = useState<SubView>({mode: 'list'});
@@ -77,7 +79,7 @@ export function AIPalsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen) =
   return (
     <AIPalScaffold scroll onBack={() => onNavigate({name: 'chat'})}>
       <Text style={typography.title}>AIPals</Text>
-      <Text style={styles.subtitle}>Distinct assistants with their own personality.</Text>
+      <Text style={[typography.caption, styles.subtitle]}>Distinct assistants with their own personality.</Text>
 
       <PrimaryButton
         label="+ Create AIPal"
@@ -102,6 +104,6 @@ export function AIPalsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen) =
 }
 
 const styles = StyleSheet.create({
-  subtitle: {...typography.caption, marginTop: spacing.xs, marginBottom: spacing.md},
+  subtitle: {marginTop: spacing.xs, marginBottom: spacing.md},
   createButton: {marginBottom: spacing.md},
 });

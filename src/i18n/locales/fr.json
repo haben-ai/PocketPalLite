@@ -1,12 +1,6 @@
 {
   "drawer": {
     "newChat": "Nouvelle discussion",
-    "models": "Modèles",
-    "aipals": "AIPals",
-    "discover": "Découvrir",
-    "benchmark": "Performance",
-    "settings": "Paramètres",
-    "appInfo": "Infos sur l'app",
     "chats": "Discussions",
     "noConversations": "Aucune conversation pour le moment."
   },
@@ -29,6 +23,8 @@
     "useMemoryLock": "Verrouillage mémoire",
     "memoryMapping": "Mappage mémoire",
     "modelLoadingSettings": "Paramètres de chargement du modèle",
+    "gpuAcceleration": "Accélération GPU",
+    "gpuAccelerationDescription": "Décharge les couches du modèle vers le GPU de l'appareil lorsque c'est pris en charge (Adreno). Revient automatiquement au CPU sur les appareils non compatibles. Un rechargement du modèle est nécessaire pour que les changements prennent effet.",
     "autoOffload": "Déchargement automatique",
     "autoNavigate": "Accéder automatiquement au chat",
     "appSettings": "Paramètres de l'application",

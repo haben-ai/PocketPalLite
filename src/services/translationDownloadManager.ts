@@ -1,6 +1,6 @@
 import RNFS from 'react-native-fs';
 import {TranslationModelInfo} from '../types';
-import {downloadToFile, getFreeStorageBytes} from './downloadManager';
+import {downloadToFile, getFreeStorageBytes, DownloadCancelledError} from './downloadManager';
 import {registerDownloadedTranslationModel} from '../storage/translationModelRegistry';
 
 const TRANSLATION_MODELS_DIR = `${RNFS.DocumentDirectoryPath}/translation-models`;
@@ -24,9 +24,14 @@ export type TranslationDownloadHandle = {
 /**
  * Downloads the 4 files a translation model needs (encoder, decoder,
  * tokenizer.json, tokenizer_config.json) sequentially, reusing the same
- * single-file primitive (downloadToFile) the LLM downloader uses.
- * onProgress reports a single aggregated 0..1 fraction across all 4 files,
- * weighted by their (approximate) sizes.
+ * single-file primitive (downloadToFile) the LLM downloader uses. A file
+ * already fully present at its final path (from an earlier run that got
+ * interrupted partway through a *later* file) is skipped entirely rather
+ * than re-downloaded, so retrying a multi-file download only re-fetches
+ * the one file that was actually in progress -- each individual file
+ * still restarts from byte 0 on its own retry, since RNFS has no
+ * Range-resume primitive. onProgress reports a single aggregated 0..1
+ * fraction across all 4 files, weighted by their (approximate) sizes.
  */
 export function downloadTranslationModel(
   model: TranslationModelInfo,
@@ -72,10 +77,17 @@ export function downloadTranslationModel(
 
     for (const file of files) {
       if (cancelled) {
-        throw new Error('Download cancelled');
+        throw new DownloadCancelledError();
       }
       const toFile = filePathFor(model.id, file.fileName);
       paths[file.fileName] = toFile;
+
+      if (await RNFS.exists(toFile)) {
+        // Already fully downloaded in an earlier run -- don't re-fetch it.
+        bytesDoneBefore += file.sizeBytes;
+        onProgress(Math.min(1, bytesDoneBefore / totalBytes));
+        continue;
+      }
 
       await new Promise<void>((resolve, reject) => {
         const handle = downloadToFile(file.url, toFile, fraction => {

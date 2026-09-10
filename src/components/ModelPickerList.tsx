@@ -1,9 +1,11 @@
 import React from 'react';
 import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
-import {colors, radius, spacing, typography} from '../theme';
+import {radius, spacing} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 import {DownloadedModel} from '../types';
 import {getModelById} from '../data/models';
 import {CapabilityBadge} from './Badge';
+import {VendorLogo} from './VendorLogo';
 
 /**
  * A list of downloaded models to pick from, shared by ConversationDrawer's
@@ -19,9 +21,11 @@ export function ModelPickerList({
   onSelect: (modelId: string) => void;
   activeModelId?: string;
 }) {
+  const {colors, typography} = useTheme();
+
   if (models.length === 0) {
     return (
-      <Text style={styles.emptyHint}>
+      <Text style={[typography.caption, styles.emptyHint]}>
         No models downloaded yet. Browse Models to get one.
       </Text>
     );
@@ -35,9 +39,16 @@ export function ModelPickerList({
         return (
           <TouchableOpacity
             key={dm.modelId}
-            style={[styles.row, isActive && styles.rowActive]}
+            style={[
+              styles.row,
+              {borderTopColor: colors.outlineVariant},
+              isActive && {backgroundColor: colors.accentMuted},
+            ]}
             onPress={() => onSelect(dm.modelId)}>
-            <Text style={styles.rowText} numberOfLines={1}>
+            <View style={styles.rowAvatar}>
+              <VendorLogo vendor={catalogModel?.vendor} size={18} mutedColor={colors.textSecondary} />
+            </View>
+            <Text style={[typography.body, styles.rowText]} numberOfLines={1}>
               {dm.displayName}
             </Text>
             {catalogModel?.capability === 'vision' && (
@@ -59,9 +70,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs,
     borderRadius: radius.sm,
     borderTopWidth: 1,
-    borderTopColor: colors.outlineVariant,
   },
-  rowActive: {backgroundColor: colors.accentMuted},
-  rowText: {...typography.body, flexShrink: 1, marginRight: spacing.xs},
-  emptyHint: {...typography.caption, marginTop: spacing.sm},
+  rowAvatar: {width: 20, alignItems: 'center', marginRight: spacing.xs},
+  rowText: {flexShrink: 1, marginRight: spacing.xs},
+  emptyHint: {marginTop: spacing.sm},
 });

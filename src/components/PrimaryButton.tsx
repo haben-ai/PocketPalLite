@@ -17,6 +17,11 @@ type Props = {
   disabled?: boolean;
   loading?: boolean;
   style?: ViewStyle;
+  /** Renders in place of the text label when given -- `label` is still
+   * required and used as the accessibility label for screen readers, since
+   * an icon alone conveys nothing to them. Receives the same color the
+   * text label would have used, so it stays legible across variants. */
+  icon?: (color: string) => React.ReactNode;
 };
 
 export function PrimaryButton({
@@ -26,6 +31,7 @@ export function PrimaryButton({
   disabled,
   loading,
   style,
+  icon,
 }: Props) {
   const scale = useRef(new Animated.Value(1)).current;
   const {colors} = useTheme();
@@ -51,7 +57,8 @@ export function PrimaryButton({
       onPress={onPress}
       onPressIn={() => animateTo(0.97)}
       onPressOut={() => animateTo(1)}
-      activeOpacity={0.9}>
+      activeOpacity={0.9}
+      accessibilityLabel={icon ? label : undefined}>
       <Animated.View
         style={[
           styles.button,
@@ -61,6 +68,8 @@ export function PrimaryButton({
         ]}>
         {loading ? (
           <ActivityIndicator color={textColor} size="small" />
+        ) : icon ? (
+          icon(textColor)
         ) : (
           <Text style={[styles.label, {color: textColor}]}>{label}</Text>
         )}

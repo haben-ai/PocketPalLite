@@ -1,7 +1,9 @@
 import React from 'react';
 import {Modal, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
-import {colors, radius, spacing, typography} from '../theme';
+import {radius, spacing} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 import {Persona} from '../types';
+import {AssistantAvatarIcon} from './Icons';
 
 /**
  * Sibling to ModelSelector -- same bottom-sheet shell, rows are AIPal
@@ -20,28 +22,39 @@ export function PersonaSelector({
   activePersonaId?: string;
   onSelect: (personaId: string) => void;
 }) {
+  const {colors, typography} = useTheme();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity
         style={styles.backdrop}
         activeOpacity={1}
         onPress={onClose}>
-        <View style={styles.sheet}>
+        <View
+          style={[
+            styles.sheet,
+            {backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant},
+          ]}>
           <Text style={typography.heading}>Switch AIPal</Text>
-          <Text style={styles.hint}>This chat continues with the new AIPal.</Text>
+          <Text style={[typography.caption, styles.hint]}>This chat continues with the new AIPal.</Text>
           {personas.map(persona => {
             const isActive = persona.id === activePersonaId;
             return (
               <TouchableOpacity
                 key={persona.id}
-                style={[styles.row, isActive && styles.rowActive]}
+                style={[
+                  styles.row,
+                  {borderTopColor: colors.outlineVariant},
+                  isActive && {backgroundColor: colors.accentMuted},
+                ]}
                 onPress={() => onSelect(persona.id)}>
-                <Text style={styles.avatar}>{persona.avatarEmoji}</Text>
+                <View style={styles.avatar}>
+                  <AssistantAvatarIcon id={persona.avatarIcon} size={20} color={colors.accent} />
+                </View>
                 <View style={styles.rowText}>
                   <Text style={typography.body} numberOfLines={1}>
                     {persona.name}
                   </Text>
-                  <Text style={styles.tagline} numberOfLines={1}>
+                  <Text style={[typography.small, styles.tagline]} numberOfLines={1}>
                     {persona.tagline}
                   </Text>
                 </View>
@@ -61,15 +74,13 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: colors.surfaceContainerLow,
     borderTopLeftRadius: radius.lg,
     borderTopRightRadius: radius.lg,
     padding: spacing.md,
     paddingBottom: spacing.xl,
     borderTopWidth: 1,
-    borderColor: colors.outlineVariant,
   },
-  hint: {...typography.caption, marginTop: 2, marginBottom: spacing.sm},
+  hint: {marginTop: 2, marginBottom: spacing.sm},
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -77,11 +88,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs,
     borderRadius: radius.sm,
     borderTopWidth: 1,
-    borderTopColor: colors.outlineVariant,
     gap: spacing.sm,
   },
-  rowActive: {backgroundColor: colors.accentMuted},
-  avatar: {fontSize: 22},
+  avatar: {width: 22, alignItems: 'center'},
   rowText: {flex: 1},
-  tagline: {...typography.small, marginTop: 1},
+  tagline: {marginTop: 1},
 });

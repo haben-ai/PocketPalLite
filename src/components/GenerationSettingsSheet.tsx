@@ -9,7 +9,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {colors, radius, spacing, typography} from '../theme';
+import {radius, spacing} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 import {AppSettings, MirostatMode} from '../storage/appSettings';
 import {Slider} from './Slider';
 
@@ -36,16 +37,19 @@ function SliderRow({
   decimals: number;
   onChange: (v: number) => void;
 }) {
+  const {colors, typography} = useTheme();
   return (
     <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowDescription}>{description}</Text>
+      <Text style={[typography.small, styles.rowLabel, {color: colors.textMuted}]}>{label}</Text>
+      <Text style={[typography.caption, styles.rowDescription, {color: colors.textSecondary}]}>
+        {description}
+      </Text>
       <View style={styles.sliderRow}>
         <View style={styles.sliderTrackWrap}>
           <Slider value={value} min={min} max={max} step={step} onValueChange={onChange} />
         </View>
-        <View style={styles.valueBox}>
-          <Text style={styles.valueBoxText}>{formatValue(value, decimals)}</Text>
+        <View style={[styles.valueBox, {borderColor: colors.border}]}>
+          <Text style={typography.body}>{formatValue(value, decimals)}</Text>
         </View>
       </View>
     </View>
@@ -63,11 +67,16 @@ function ToggleRow({
   value: boolean;
   onChange: (v: boolean) => void;
 }) {
+  const {colors, typography} = useTheme();
   return (
     <View style={[styles.row, styles.toggleRow]}>
       <View style={styles.toggleTextCol}>
-        <Text style={styles.rowLabel}>{label}</Text>
-        {description ? <Text style={styles.rowDescription}>{description}</Text> : null}
+        <Text style={[typography.small, styles.rowLabel, {color: colors.textMuted}]}>{label}</Text>
+        {description ? (
+          <Text style={[typography.caption, styles.rowDescription, {color: colors.textSecondary}]}>
+            {description}
+          </Text>
+        ) : null}
       </View>
       <Switch
         value={value}
@@ -92,22 +101,31 @@ function SegmentedRow<T extends string | number>({
   value: T;
   onChange: (v: T) => void;
 }) {
+  const {colors, typography} = useTheme();
   return (
     <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      {description ? <Text style={styles.rowDescription}>{description}</Text> : null}
-      <View style={styles.segmentedControl}>
+      <Text style={[typography.small, styles.rowLabel, {color: colors.textMuted}]}>{label}</Text>
+      {description ? (
+        <Text style={[typography.caption, styles.rowDescription, {color: colors.textSecondary}]}>
+          {description}
+        </Text>
+      ) : null}
+      <View style={[styles.segmentedControl, {borderColor: colors.border}]}>
         {options.map((opt, i) => (
           <TouchableOpacity
             key={String(opt.value)}
             style={[
               styles.segment,
-              value === opt.value && styles.segmentActive,
-              i > 0 && styles.segmentBorder,
+              value === opt.value && {backgroundColor: colors.surfaceContainerHigh},
+              i > 0 && [styles.segmentBorder, {borderLeftColor: colors.border}],
             ]}
             onPress={() => onChange(opt.value)}>
             <Text
-              style={[styles.segmentLabel, value === opt.value && styles.segmentLabelActive]}>
+              style={[
+                typography.body,
+                {color: colors.textSecondary},
+                value === opt.value && {color: colors.textPrimary, fontWeight: '700'},
+              ]}>
               {opt.label}
             </Text>
           </TouchableOpacity>
@@ -135,6 +153,7 @@ export function GenerationSettingsSheet({
   onSave: (next: AppSettings) => void;
   onResetToDefaults: () => void;
 }) {
+  const {colors, typography} = useTheme();
   const [draft, setDraft] = useState<AppSettings>(settings);
 
   // Re-sync the draft whenever the sheet is (re)opened with fresh settings
@@ -149,32 +168,33 @@ export function GenerationSettingsSheet({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={styles.container}>
-        <View style={styles.header}>
+      <View style={[styles.container, {backgroundColor: colors.background}]}>
+        <View style={[styles.header, {borderBottomColor: colors.outlineVariant}]}>
           <Text style={typography.heading}>Chat Generation Settings</Text>
           <TouchableOpacity onPress={onClose} hitSlop={8}>
-            <Text style={styles.closeLabel}>✕</Text>
+            <Text style={[styles.closeLabel, {color: colors.textSecondary}]}>✕</Text>
           </TouchableOpacity>
         </View>
 
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>N Predict</Text>
-            <Text style={styles.rowDescription}>
+            <Text style={[typography.small, styles.rowLabel, {color: colors.textMuted}]}>N Predict</Text>
+            <Text style={[typography.caption, styles.rowDescription, {color: colors.textSecondary}]}>
               Maximum number of tokens to generate. Set to Unlimited for no limit, or Custom to
               specify a value.
             </Text>
-            <View style={styles.segmentedControl}>
+            <View style={[styles.segmentedControl, {borderColor: colors.border}]}>
               <TouchableOpacity
                 style={[
                   styles.segment,
-                  draft.nPredictMode === 'unlimited' && styles.segmentActive,
+                  draft.nPredictMode === 'unlimited' && {backgroundColor: colors.surfaceContainerHigh},
                 ]}
                 onPress={() => patch({nPredictMode: 'unlimited'})}>
                 <Text
                   style={[
-                    styles.segmentLabel,
-                    draft.nPredictMode === 'unlimited' && styles.segmentLabelActive,
+                    typography.body,
+                    {color: colors.textSecondary},
+                    draft.nPredictMode === 'unlimited' && {color: colors.textPrimary, fontWeight: '700'},
                   ]}>
                   Unlimited
                 </Text>
@@ -183,13 +203,15 @@ export function GenerationSettingsSheet({
                 style={[
                   styles.segment,
                   styles.segmentBorder,
-                  draft.nPredictMode === 'custom' && styles.segmentActive,
+                  {borderLeftColor: colors.border},
+                  draft.nPredictMode === 'custom' && {backgroundColor: colors.surfaceContainerHigh},
                 ]}
                 onPress={() => patch({nPredictMode: 'custom'})}>
                 <Text
                   style={[
-                    styles.segmentLabel,
-                    draft.nPredictMode === 'custom' && styles.segmentLabelActive,
+                    typography.body,
+                    {color: colors.textSecondary},
+                    draft.nPredictMode === 'custom' && {color: colors.textPrimary, fontWeight: '700'},
                   ]}>
                   Custom
                 </Text>
@@ -203,7 +225,10 @@ export function GenerationSettingsSheet({
                   patch({maxTokens: Number.isFinite(n) ? n : 0});
                 }}
                 keyboardType="number-pad"
-                style={styles.textInput}
+                style={[
+                  styles.textInput,
+                  {backgroundColor: colors.surface, color: colors.textPrimary, borderColor: colors.border},
+                ]}
               />
             )}
           </View>
@@ -339,8 +364,8 @@ export function GenerationSettingsSheet({
           />
 
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>Seed</Text>
-            <Text style={styles.rowDescription}>
+            <Text style={[typography.small, styles.rowLabel, {color: colors.textMuted}]}>Seed</Text>
+            <Text style={[typography.caption, styles.rowDescription, {color: colors.textSecondary}]}>
               Set the random number generator seed. Useful for reproducible results
             </Text>
             <TextInput
@@ -350,7 +375,10 @@ export function GenerationSettingsSheet({
                 patch({seed: Number.isFinite(n) ? n : -1});
               }}
               keyboardType="numbers-and-punctuation"
-              style={styles.textInput}
+              style={[
+                styles.textInput,
+                {backgroundColor: colors.surface, color: colors.textPrimary, borderColor: colors.border},
+              ]}
             />
           </View>
 
@@ -362,20 +390,20 @@ export function GenerationSettingsSheet({
           />
         </ScrollView>
 
-        <View style={styles.footer}>
+        <View style={[styles.footer, {borderTopColor: colors.outlineVariant}]}>
           <TouchableOpacity
             onPress={() => {
               onResetToDefaults();
             }}>
-            <Text style={styles.resetLabel}>Reset to System Defaults</Text>
+            <Text style={[typography.caption, {color: colors.textSecondary}]}>Reset to System Defaults</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.saveButton}
+            style={[styles.saveButton, {backgroundColor: colors.accent}]}
             onPress={() => {
               onSave(draft);
               onClose();
             }}>
-            <Text style={styles.saveLabel}>Save Changes</Text>
+            <Text style={[styles.saveLabel, {color: colors.onAccent}]}>Save Changes</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -384,7 +412,7 @@ export function GenerationSettingsSheet({
 }
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: colors.background},
+  container: {flex: 1},
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -393,13 +421,12 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl,
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.outlineVariant,
   },
-  closeLabel: {color: colors.textSecondary, fontSize: 20},
+  closeLabel: {fontSize: 20},
   content: {padding: spacing.md, paddingBottom: spacing.xl},
   row: {marginBottom: spacing.lg},
-  rowLabel: {...typography.small, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5},
-  rowDescription: {...typography.caption, marginTop: 4, marginBottom: spacing.sm, lineHeight: 18},
+  rowLabel: {textTransform: 'uppercase', letterSpacing: 0.5},
+  rowDescription: {marginTop: 4, marginBottom: spacing.sm, lineHeight: 18},
   sliderRow: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm},
   sliderTrackWrap: {flex: 1},
   valueBox: {
@@ -408,48 +435,36 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: colors.border,
     alignItems: 'center',
   },
-  valueBoxText: {...typography.body},
   toggleRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
   toggleTextCol: {flex: 1, marginRight: spacing.md},
   segmentedControl: {
     flexDirection: 'row',
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
     overflow: 'hidden',
   },
   segment: {flex: 1, paddingVertical: 10, alignItems: 'center'},
-  segmentBorder: {borderLeftWidth: 1, borderLeftColor: colors.border},
-  segmentActive: {backgroundColor: colors.surfaceContainerHigh},
-  segmentLabel: {...typography.body, color: colors.textSecondary},
-  segmentLabelActive: {color: colors.textPrimary, fontWeight: '700'},
+  segmentBorder: {borderLeftWidth: 1},
   textInput: {
     marginTop: spacing.sm,
-    backgroundColor: colors.surface,
-    color: colors.textPrimary,
     borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: colors.border,
     paddingHorizontal: spacing.sm,
     paddingVertical: 10,
   },
   footer: {
     padding: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: colors.outlineVariant,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  resetLabel: {...typography.caption, color: colors.textSecondary},
   saveButton: {
-    backgroundColor: colors.accent,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.lg,
     paddingVertical: 12,
   },
-  saveLabel: {color: colors.onAccent, fontWeight: '700'},
+  saveLabel: {fontWeight: '700'},
 });

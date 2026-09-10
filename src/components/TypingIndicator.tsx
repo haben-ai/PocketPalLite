@@ -1,6 +1,6 @@
 import React, {useEffect, useRef} from 'react';
 import {Animated, StyleSheet, View} from 'react-native';
-import {colors} from '../theme';
+import {useTheme} from '../theme/ThemeContext';
 
 const DOT_COUNT = 3;
 const BOUNCE_HEIGHT = 5;
@@ -13,6 +13,7 @@ const STAGGER = 120;
  * the assistant is streaming a reply.
  */
 export function TypingIndicator() {
+  const {colors} = useTheme();
   const values = useRef(
     Array.from({length: DOT_COUNT}, () => new Animated.Value(0)),
   ).current;
@@ -47,6 +48,7 @@ export function TypingIndicator() {
           key={i}
           style={[
             styles.dot,
+            {backgroundColor: colors.textPrimary},
             {
               transform: [
                 {
@@ -74,6 +76,5 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: colors.textPrimary,
   },
 });

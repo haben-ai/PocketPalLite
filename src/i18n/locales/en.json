@@ -1,12 +1,6 @@
 {
   "drawer": {
     "newChat": "New chat",
-    "models": "Models",
-    "aipals": "AIPals",
-    "discover": "Discover",
-    "benchmark": "Benchmark",
-    "settings": "Settings",
-    "appInfo": "App Info",
     "chats": "Chats",
     "noConversations": "No conversations yet."
   },
@@ -29,6 +23,8 @@
     "useMemoryLock": "Use Memory Lock",
     "memoryMapping": "Memory Mapping",
     "modelLoadingSettings": "Model Loading Settings",
+    "gpuAcceleration": "GPU Acceleration",
+    "gpuAccelerationDescription": "Offload model layers to the device GPU when supported (Adreno). Falls back to CPU automatically on unsupported devices. Model reload needed for changes to take effect.",
     "autoOffload": "Auto Offload/Load",
     "autoNavigate": "Auto-Navigate to Chat",
     "appSettings": "App Settings",

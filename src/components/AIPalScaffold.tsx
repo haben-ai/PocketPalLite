@@ -57,11 +57,12 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
   },
   backRow: {
-    // Extra left padding vs. the standard spacing.md: on some devices the
-    // system's edge back-swipe gesture zone swallows taps that close to the
-    // true screen edge before the app sees them (see ChatScreen's header
-    // for the same fix on the hamburger button).
-    paddingLeft: spacing.xl + spacing.md,
+    // spacing.md keeps this clear of the system's edge back-swipe gesture
+    // zone on some devices (which otherwise swallows taps right at the true
+    // screen edge -- see ChatScreen's header for the same fix on its own
+    // hamburger button) while sitting much closer to the edge than the
+    // larger padding this used to have.
+    paddingLeft: spacing.md,
     paddingRight: spacing.md,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xs,

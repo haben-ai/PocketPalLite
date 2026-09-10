@@ -1,8 +1,9 @@
 /**
- * Hand-rolled screen state -- there is no persistent tab bar any more
- * (ChatGPT-style: a hamburger-opened sidebar is the only way to reach
- * Models/AIPals/Discover/Settings, Chat is the sole default surface).
- * Each variant carries only the params that screen actually needs.
+ * Hand-rolled screen state. A persistent bottom tab bar (Chat/Models/AIPals/
+ * More, plus a center New Chat action) covers the app's primary sections;
+ * "More" is its own screen listing the remaining destinations (Discover/
+ * Benchmark/Settings/App Info) that don't get their own tab slot. Each
+ * variant carries only the params that screen actually needs.
  */
 export type AppScreen =
   | {
@@ -14,7 +15,9 @@ export type AppScreen =
     }
   | {name: 'models'; highlightModelId?: string}
   | {name: 'aipals'}
+  | {name: 'more'}
   | {name: 'discover'}
   | {name: 'settings'}
   | {name: 'benchmark'}
-  | {name: 'appInfo'};
+  | {name: 'appInfo'}
+  | {name: 'openSourceLicenses'};
