@@ -24,6 +24,35 @@ export async function getFreeStorageBytes(): Promise<number> {
   return info.freeSpace;
 }
 
+/**
+ * A real reachability probe (a HEAD request to Hugging Face's own domain,
+ * which is where every catalog/remote download actually comes from), not
+ * just "is a radio turned on" -- deliberately not the
+ * @react-native-community/netinfo package, since that would add a whole new
+ * native dependency (+ native rebuild) for a check this cheap fetch already
+ * answers more accurately (a phone can have Wi-Fi "connected" with no real
+ * internet behind it, which NetInfo alone wouldn't catch). A short timeout
+ * keeps this from hanging the UI on a dead connection.
+ */
+export async function hasInternetConnection(timeoutMs = 6000): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch('https://huggingface.co', {
+      method: 'HEAD',
+      signal: controller.signal,
+    });
+    // Any real HTTP response (even a 4xx) proves the network path works --
+    // only a thrown network error (DNS failure, no route, timeout) means
+    // there's genuinely no connection.
+    return !!response;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 /** Thrown when cancel() stopped the download -- lets callers tell "the
  * user gave up on this" apart from a real transfer/verification failure. */
 export class DownloadCancelledError extends Error {

@@ -15,6 +15,7 @@ jest.mock('./downloadManager', () => {
     downloadModel: jest.fn(),
     downloadRemoteModel: jest.fn(),
     getFreeStorageBytes: jest.fn(() => Promise.resolve(1e12)),
+    hasInternetConnection: jest.fn(() => Promise.resolve(true)),
     DownloadCancelledError,
   };
 });

@@ -7,6 +7,7 @@ import {
   downloadModel,
   downloadRemoteModel,
   getFreeStorageBytes,
+  hasInternetConnection,
   DownloadCancelledError,
 } from './downloadManager';
 import {downloadTranslationModel} from './translationDownloadManager';
@@ -193,16 +194,20 @@ async function resolveSizeBytes(descriptor: QueueJobDescriptor): Promise<number>
 
 /**
  * Adds a job to the back of the queue and kicks the runner. A no-op if the
- * same job is already queued/active. Storage is checked here, up front --
- * before the item ever becomes 'downloading' -- so an obviously-too-large
- * download is rejected immediately rather than only once it reaches the
- * front of the queue.
+ * same job is already queued/active. Storage and connectivity are both
+ * checked here, up front -- before the item ever becomes 'downloading' --
+ * so an obviously-too-large download or a dead connection is rejected
+ * immediately (a clear, actionable error) rather than only surfacing once
+ * it reaches the front of the queue and fails deep inside a transfer.
  */
 export async function enqueue(descriptor: QueueJobDescriptor): Promise<void> {
   await ensureLoaded();
   const id = jobId(descriptor);
   if (items.some(i => jobId(i.descriptor) === id)) {
     return;
+  }
+  if (!(await hasInternetConnection())) {
+    throw new Error('No internet connection. Check your Wi-Fi or mobile data and try again.');
   }
   const sizeBytes = await resolveSizeBytes(descriptor);
   const freeBytes = await getFreeStorageBytes();
@@ -329,6 +334,13 @@ async function processNext(): Promise<void> {
   const id = activeJobId;
 
   try {
+    // Re-checked here (not just at enqueue time) because this item may
+    // have sat queued behind another download for a while -- connectivity
+    // present when it was enqueued doesn't guarantee it's still there now
+    // that it's actually about to start transferring.
+    if (!(await hasInternetConnection())) {
+      throw new Error('No internet connection. Check your Wi-Fi or mobile data and try again.');
+    }
     const handle = await startJob(
       claimed.descriptor,
       (fraction, bytesWritten) => {
