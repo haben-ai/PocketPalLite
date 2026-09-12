@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
-import {Alert, StyleSheet, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {StyleSheet, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {Alert} from '../components/AppDialog';
 import {pick, isErrorWithCode, errorCodes} from '@react-native-documents/picker';
 import {spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';

@@ -69,7 +69,7 @@ export function OpenSourceLicensesScreen({onNavigate}: {onNavigate: (screen: App
     <AIPalScaffold onBack={() => onNavigate({name: 'appInfo'})}>
       <Text style={typography.title}>Open Source Licenses</Text>
       <Text style={[typography.caption, styles.subtitle, {color: colors.textSecondary}]}>
-        PocketPal is built with {ENTRIES.length} open-source packages. Tap any of them to read its
+        Zayla is built with {ENTRIES.length} open-source packages. Tap any of them to read its
         license.
       </Text>
       <TextInput

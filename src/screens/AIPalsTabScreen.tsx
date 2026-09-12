@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import {Alert, StyleSheet, Text} from 'react-native';
+import {StyleSheet, Text} from 'react-native';
+import {Alert} from '../components/AppDialog';
 import {spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
 import {Persona} from '../types';

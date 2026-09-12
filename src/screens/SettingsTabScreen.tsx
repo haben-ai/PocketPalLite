@@ -1,5 +1,7 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import {Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View} from 'react-native';
+import {Linking, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View} from 'react-native';
+import DeviceInfo from 'react-native-device-info';
+import {Alert} from '../components/AppDialog';
 import {useTranslation} from 'react-i18next';
 import {radius, spacing} from '../theme';
 import {useTheme, useThemeContext} from '../theme/ThemeContext';
@@ -26,6 +28,13 @@ import {TranslationTestScreen} from './TranslationTestScreen';
 import packageJson from '../../package.json';
 
 type SubView = 'main' | 'translation-test';
+
+// The real installed applicationId (DeviceInfo.getBundleId(), same API
+// AppInfoScreen.tsx already uses), not a hardcoded "com.zayla" string
+// duplicated from build.gradle -- stays correct automatically if the
+// package id ever changes again.
+const DEVICE_PACKAGE_ID = DeviceInfo.getBundleId();
+const PRIVACY_POLICY_URL = 'https://zayla-privacy.netlify.app/';
 
 const CONTEXT_SIZE_OPTIONS = [512, 1024, 2048, 4096];
 const CACHE_TYPE_OPTIONS: CacheType[] = ['f16', 'f32', 'q8_0', 'q4_0', 'q4_1', 'iq4_nl', 'q5_0', 'q5_1'];
@@ -549,12 +558,12 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
 
       <SettingSection
         title={t('settings.internetSearch')}
-        description="Let Pals search the web with their own tools. Bring your own API key — PocketPal never holds your keys or routes your queries.">
+        description="Let Pals search the web with their own tools. Bring your own API key — Zayla never holds your keys or routes your queries.">
         <View style={styles.searchDisclosure}>
           <Text style={[typography.body, {fontWeight: '700'}]}>Searches leave your device</Text>
           <Text style={[typography.caption, {color: colors.textSecondary}, styles.rowDescription]}>
             When a Pal searches the web, your query is sent to Brave over the internet. Keys and
-            queries are never sent to PocketPal.
+            queries are never sent to Zayla.
           </Text>
           {!settings.searchDisclosureAccepted && (
             <PrimaryButton
@@ -690,6 +699,34 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
 
       <SettingSection title={t('settings.about')}>
         <SettingRow bare label={t('settings.version')} control={<Text style={typography.caption}>{packageJson.version}</Text>} />
+        <SettingRow
+          bare
+          label="Rate Zayla"
+          description="Enjoying the app? Leave a rating on the Play Store."
+          control={
+            <PrimaryButton
+              label="Rate App"
+              variant="secondary"
+              onPress={() =>
+                Linking.openURL(`market://details?id=${DEVICE_PACKAGE_ID}`).catch(() =>
+                  Linking.openURL(`https://play.google.com/store/apps/details?id=${DEVICE_PACKAGE_ID}`),
+                )
+              }
+            />
+          }
+        />
+        <SettingRow
+          bare
+          label="Privacy Policy"
+          description="What data this app accesses, and what it never does."
+          control={
+            <PrimaryButton
+              label="View"
+              variant="secondary"
+              onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
+            />
+          }
+        />
         <SettingRow
           bare
           label="Translation Test"

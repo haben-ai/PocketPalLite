@@ -13,6 +13,7 @@ import {BenchmarkScreen} from '../screens/BenchmarkScreen';
 import {AppInfoScreen} from '../screens/AppInfoScreen';
 import {OpenSourceLicensesScreen} from '../screens/OpenSourceLicensesScreen';
 import {BottomTabBar} from '../components/BottomTabBar';
+import {DialogHost} from '../components/AppDialog';
 
 /**
  * A persistent bottom tab bar (Chat/Models/New Chat/AIPals/More) sits below
@@ -104,6 +105,10 @@ export function RootNavigator({initialScreen}: {initialScreen?: AppScreen}) {
     <View style={{flex: 1, backgroundColor: colors.background}}>
       <View style={{flex: 1}}>{content}</View>
       <BottomTabBar current={screen.name} onNavigate={setScreen} />
+      {/* Mounted once here rather than per-screen -- every Alert.alert()
+          call anywhere in the app (imported from AppDialog instead of
+          react-native) renders through this single host. */}
+      <DialogHost />
     </View>
   );
 }

@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from 'react';
-import {Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {Alert} from '../components/AppDialog';
 import DeviceInfo from 'react-native-device-info';
 import {radius, spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';

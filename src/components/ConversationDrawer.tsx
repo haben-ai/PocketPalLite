@@ -1,6 +1,5 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
-  Alert,
   Animated,
   BackHandler,
   Dimensions,
@@ -11,6 +10,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import {Alert} from './AppDialog';
 import {useTranslation} from 'react-i18next';
 import {motion, radius, spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';

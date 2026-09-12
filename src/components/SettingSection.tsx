@@ -7,7 +7,7 @@ import {Card} from './Card';
 /**
  * A titled card grouping several `SettingRow`s (rendered with `bare`) under
  * one shared background, separated by hairlines -- matches the grouped-card
- * layout of PocketPal AI's Settings screen, in place of the previous "one
+ * layout of Zayla's Settings screen, in place of the previous "one
  * card per row" layout.
  */
 export function SettingSection({

@@ -4,7 +4,7 @@ import {Image, StyleSheet} from 'react-native';
 const appIcon = require('../assets/images/app-icon.png');
 
 /**
- * The app's own brand mark -- used everywhere a "this is PocketPal" glyph
+ * The app's own brand mark -- used everywhere a "this is Zayla" glyph
  * is needed (empty states, About screen, onboarding) so there's one place
  * the real logo image is wired in; every call site updates at once. The
  * source image already includes its own white rounded-square card, so it's

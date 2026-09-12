@@ -1,6 +1,5 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {
-  Alert,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -9,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {Alert} from '../components/AppDialog';
 import {spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
 import {TRANSLATION_MODEL_CATALOG} from '../data/translationModels';

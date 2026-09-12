@@ -1,4 +1,4 @@
-package com.pocketpallite
+package com.zayla
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule

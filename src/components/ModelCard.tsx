@@ -1,5 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Alert, Animated, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {Animated, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {Alert} from './AppDialog';
 import {radius, spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
 import {DeviceTier, DownloadedModel, ModelCapability, ModelTier, ModelVendor} from '../types';

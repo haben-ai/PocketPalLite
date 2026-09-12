@@ -11,7 +11,7 @@ export interface SearchProvider {
 /**
  * Brave Search API, called directly from the device with the user's own
  * key -- the app's first generic outbound HTTP request (everything else is
- * either on-device inference or RNFS model downloads). No PocketPal-side
+ * either on-device inference or RNFS model downloads). No Zayla-side
  * relay: the request goes straight from this device to Brave.
  */
 export class BraveSearchProvider implements SearchProvider {

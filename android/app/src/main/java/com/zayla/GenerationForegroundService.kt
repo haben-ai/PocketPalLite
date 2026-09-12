@@ -1,4 +1,4 @@
-package com.pocketpallite
+package com.zayla
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -77,7 +77,7 @@ class GenerationForegroundService : Service() {
           "Response generation",
           NotificationManager.IMPORTANCE_LOW,
         ).apply {
-          description = "Shown while PocketPal is generating a reply in the background."
+          description = "Shown while Zayla is generating a reply in the background."
         },
       )
     }

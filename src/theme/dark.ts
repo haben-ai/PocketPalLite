@@ -22,10 +22,10 @@ export const darkColors = {
   textSecondary: '#B4B4B4',
   textMuted: '#8E8EA0',
 
-  // Brand red (matches the red starburst logo, replacing the earlier blue
-  // "VS" bird/heart brand) -- an explicit, requested rebrand, not a guess.
-  accent: '#DC2626',
-  accentMuted: '#DC262626',
+  // Brand blue -- explicit hex (#0081FB) requested by name, replacing the
+  // earlier red rebrand.
+  accent: '#0081FB',
+  accentMuted: '#0081FB26',
   onAccent: '#FFFFFF',
 
   userBubble: '#2F2F2F',

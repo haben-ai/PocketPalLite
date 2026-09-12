@@ -1,4 +1,4 @@
-package com.pocketpallite
+package com.zayla
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -70,7 +70,7 @@ class GenerationServiceModule(reactContext: ReactApplicationContext) :
   fun showCompletionNotification(question: String, promise: Promise) {
     try {
       ensureCompletionChannel()
-      val title = question.ifBlank { "PocketPal" }
+      val title = question.ifBlank { "Zayla" }
       val openAppIntent = reactApplicationContext.packageManager
         .getLaunchIntentForPackage(reactApplicationContext.packageName)?.apply {
           flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -110,7 +110,7 @@ class GenerationServiceModule(reactContext: ReactApplicationContext) :
           "Reply ready",
           NotificationManager.IMPORTANCE_DEFAULT,
         ).apply {
-          description = "Shown when PocketPal finishes a reply while the app is in the background."
+          description = "Shown when Zayla finishes a reply while the app is in the background."
         },
       )
     }

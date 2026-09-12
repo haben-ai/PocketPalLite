@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
-import {Alert, Modal, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {Modal, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {Alert} from './AppDialog';
 import {pick, isErrorWithCode, errorCodes} from '@react-native-documents/picker';
 import {radius, spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';

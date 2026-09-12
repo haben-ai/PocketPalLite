@@ -1,4 +1,4 @@
-package com.pocketpallite
+package com.zayla
 
 import android.app.Application
 import com.facebook.react.PackageList

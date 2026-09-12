@@ -1,4 +1,4 @@
-package com.pocketpallite
+package com.zayla
 
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
