@@ -23,10 +23,10 @@ export const lightColors = {
   textSecondary: '#5A5A5F',
   textMuted: '#8E8E93',
 
-  // Brand blue (matches the app icon's gradient) -- replaces the old
-  // plain black/white inversion now that the app has a real brand color.
-  accent: '#2F6FED',
-  accentMuted: '#2F6FED1F',
+  // Brand red (matches the red starburst logo, replacing the earlier blue
+  // "VS" bird/heart brand) -- an explicit, requested rebrand, not a guess.
+  accent: '#DC2626',
+  accentMuted: '#DC26261F',
   onAccent: '#FFFFFF',
 
   userBubble: '#EDEDEF',

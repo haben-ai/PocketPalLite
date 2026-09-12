@@ -81,7 +81,7 @@ export async function ensureBuiltInPersonaSeeded(): Promise<Persona> {
       ...existing,
       name: ASSISTANT_NAME,
       tagline: 'Your on-device AI assistant',
-      avatarIcon: 'bot',
+      avatarIcon: 'short-crop',
       systemPrompt: SYSTEM_PROMPT,
       updatedAt: Date.now(),
     };
@@ -96,7 +96,7 @@ export async function ensureBuiltInPersonaSeeded(): Promise<Persona> {
     id: BUILT_IN_PERSONA_ID,
     name: ASSISTANT_NAME,
     tagline: 'Your on-device AI assistant',
-    avatarIcon: 'bot',
+    avatarIcon: 'short-crop',
     systemPrompt: SYSTEM_PROMPT,
     isBuiltIn: true,
     createdAt: now,

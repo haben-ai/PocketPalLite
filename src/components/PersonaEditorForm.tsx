@@ -76,11 +76,7 @@ export function PersonaEditorForm({
               {backgroundColor: colors.surfaceContainerHigh, borderColor: 'transparent'},
               avatarIcon === iconId && {borderColor: colors.accent, backgroundColor: colors.accentMuted},
             ]}>
-            <AssistantAvatarIcon
-              id={iconId}
-              size={20}
-              color={avatarIcon === iconId ? colors.accent : colors.textSecondary}
-            />
+            <AssistantAvatarIcon id={iconId} size={40} />
           </TouchableOpacity>
         ))}
       </View>

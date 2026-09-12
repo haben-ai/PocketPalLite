@@ -75,7 +75,7 @@ describe('ensureBuiltInPersonaSeeded', () => {
     expect(healed.name).toBe(ASSISTANT_NAME);
     expect(healed.systemPrompt).toBe(SYSTEM_PROMPT);
     expect(healed.systemPrompt).not.toContain('MustaAI');
-    expect(healed.avatarIcon).toBe('bot');
+    expect(healed.avatarIcon).toBe('short-crop');
 
     const all = await getPersonas();
     expect(all).toHaveLength(1);

@@ -2,47 +2,37 @@ import React from 'react';
 import {StyleSheet, TouchableOpacity} from 'react-native';
 import {
   ArrowUpFromLine,
-  Bot,
-  Brain,
   Check,
   ChevronDown,
   CloudDownload,
-  Compass,
   Copy,
   Download,
   Drama,
   EllipsisVertical,
   Eye,
-  Flame,
   FolderPlus,
   Gauge,
-  Heart,
   Home,
   Info,
   LayoutGrid,
-  Leaf,
   Menu,
   MessageSquarePlus,
   MoreHorizontal,
-  Palette,
   Pause,
   Pencil,
   Play,
   Plus,
-  Rocket,
   RotateCcw,
   Settings,
   SlidersHorizontal,
   Sparkles,
-  Star,
-  Target,
   ThumbsDown,
   ThumbsUp,
   Trash,
   Upload,
   X,
-  Zap,
 } from 'lucide-react-native';
+import {PersonAvatar, PERSON_AVATAR_IDS} from './PersonAvatars';
 
 /**
  * Lucide-style outline icon set: 24x24 grid, 2px stroke, rounded caps/
@@ -112,41 +102,28 @@ export const HomeIcon = ({size = SIZE, color}: IconProps) => <Home size={size} c
 export const MoreIcon = ({size = SIZE, color}: IconProps) => <MoreHorizontal size={size} color={color} />;
 
 /**
- * AIPal/persona avatars used to be a free-choice emoji; personas now store
- * an icon id from this fixed set instead (see types.ts::Persona.avatarIcon)
- * for a consistent, professional look. An unrecognized id (a legacy emoji
- * character from before this change, or any bad data) falls back to Bot
- * rather than rendering nothing.
+ * AIPal/persona avatars used to be abstract lucide glyphs (bot/sparkles/
+ * brain/...); personas now store an id from PersonAvatars.tsx's diverse
+ * flat-vector "person bust" set instead (see types.ts::Persona.avatarIcon),
+ * matching a requested people-not-icons look. `color` is kept in the props
+ * signature for source compatibility with every existing call site (they
+ * all pass one, e.g. colors.accent for a selected state) but is unused --
+ * a person avatar has its own fixed skin/hair/clothing palette, unlike a
+ * single-color glyph, so there's nothing to tint. An unrecognized id (a
+ * legacy lucide id like "bot" from before this change, or any bad data)
+ * falls back to the first person avatar rather than rendering nothing.
  */
-const ASSISTANT_ICON_COMPONENTS = {
-  bot: Bot,
-  sparkles: Sparkles,
-  brain: Brain,
-  zap: Zap,
-  star: Star,
-  flame: Flame,
-  leaf: Leaf,
-  target: Target,
-  palette: Palette,
-  compass: Compass,
-  heart: Heart,
-  rocket: Rocket,
-} as const;
-
-export const ASSISTANT_ICON_IDS = Object.keys(ASSISTANT_ICON_COMPONENTS);
+export const ASSISTANT_ICON_IDS = PERSON_AVATAR_IDS;
 
 export function AssistantAvatarIcon({
   id,
   size = SIZE,
-  color,
 }: {
   id: string;
   size?: number;
-  color: string;
+  color?: string;
 }) {
-  const IconComponent =
-    ASSISTANT_ICON_COMPONENTS[id as keyof typeof ASSISTANT_ICON_COMPONENTS] ?? Bot;
-  return <IconComponent size={size} color={color} />;
+  return <PersonAvatar id={id} size={size} />;
 }
 
 /**

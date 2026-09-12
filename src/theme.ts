@@ -40,9 +40,10 @@ export const colors = {
   textSecondary: '#B4B4B4',
   textMuted: '#8E8EA0',
 
-  // Brand blue (matches the app icon's gradient).
-  accent: '#2F6FED',
-  accentMuted: '#2F6FED26',
+  // Brand red (matches the red starburst logo, replacing the earlier blue
+  // "VS" bird/heart brand).
+  accent: '#DC2626',
+  accentMuted: '#DC262626',
   onAccent: '#FFFFFF',
 
   // Assistant messages have no bubble at all (plain text on background),
