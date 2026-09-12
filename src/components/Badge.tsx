@@ -57,6 +57,18 @@ export function Chip({label}: {label: string}) {
   );
 }
 
+/** Colored, borderless pill for a model's at-a-glance spec pair (e.g.
+ * "Fast" / "Good quality") -- distinct from Chip's neutral bordered style,
+ * used specifically for the tier-tinted spec badges under a not-yet-
+ * downloaded model's name. */
+export function SpecChip({label, fg, bg}: {label: string; fg: string; bg: string}) {
+  return (
+    <View style={[styles.specChip, {backgroundColor: bg}]}>
+      <Text style={[styles.specChipLabel, {color: fg}]}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
@@ -79,4 +91,11 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   chipLabel: {fontSize: 12, fontWeight: '600'},
+  specChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    alignSelf: 'flex-start',
+  },
+  specChipLabel: {fontSize: 12, fontWeight: '600'},
 });
