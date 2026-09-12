@@ -28,6 +28,15 @@ export type QueueItem = {
   descriptor: QueueJobDescriptor;
   status: QueueItemStatus;
   fraction: number;
+  /** Real bytes transferred so far (from RNFS's own progress callback, not
+   * derived from fraction*totalBytes -- stays accurate even before
+   * totalBytes is known for a not-yet-resolved remote URL). */
+  bytesWritten: number;
+  /** Resolved once at enqueue time (resolveSizeBytes) so the UI can show
+   * "X MB / Y MB" from the very first progress tick, not just once transfer
+   * starts. 0 when genuinely unknown (a remote URL without a declared
+   * Content-Length). */
+  totalBytes: number;
   error?: string;
   addedAt: number;
 };
@@ -91,11 +100,32 @@ export function __resetForTests(): void {
 
 function persist(): void {
   setJSON(KEYS.downloadQueue, items).catch(() => undefined);
+  lastPersistAt = Date.now();
 }
+
+// Progress ticks arrive far more often (every ~2% via RNFS's
+// progressDivider) than the on-disk queue snapshot actually needs updating
+// -- persisting on every tick meant serializing and writing the whole queue
+// array to AsyncStorage ~50 times over one download, real, avoidable I/O
+// and JS-thread work that had nothing to do with the transfer itself.
+// notify() still updates listeners (cheap: a React state set) on every
+// tick for a smooth-reading UI; persistence is throttled to this interval,
+// with notifyAndPersist() used for status transitions (queued/downloading/
+// failed/removed) that must survive a kill immediately rather than up to an
+// interval late.
+const PERSIST_INTERVAL_MS = 1000;
+let lastPersistAt = 0;
 
 function notify(): void {
   const snapshot = items;
   listeners.forEach(l => l(snapshot));
+  if (Date.now() - lastPersistAt >= PERSIST_INTERVAL_MS) {
+    persist();
+  }
+}
+
+function notifyAndPersist(): void {
+  listeners.forEach(l => l(items));
   persist();
 }
 
@@ -118,7 +148,16 @@ async function ensureLoaded(): Promise<void> {
   if (!loadPromise) {
     loadPromise = (async () => {
       const stored = await getJSON<QueueItem[]>(KEYS.downloadQueue, []);
-      items = stored.map(i => (i.status === 'downloading' ? {...i, status: 'queued' as const} : i));
+      // bytesWritten/totalBytes default to 0 for a queue item persisted by
+      // an older build that predates those fields -- the UI falls back to
+      // percentage-only display until the next progress tick fills them in
+      // for real, rather than showing NaN/undefined.
+      items = stored.map(i => ({
+        ...i,
+        status: i.status === 'downloading' ? ('queued' as const) : i.status,
+        bytesWritten: i.bytesWritten ?? 0,
+        totalBytes: i.totalBytes ?? 0,
+      }));
       loaded = true;
       notify();
       processNext();
@@ -174,8 +213,11 @@ export async function enqueue(descriptor: QueueJobDescriptor): Promise<void> {
       ).toFixed(1)} GB free.`,
     );
   }
-  items = [...items, {descriptor, status: 'queued', fraction: 0, addedAt: Date.now()}];
-  notify();
+  items = [
+    ...items,
+    {descriptor, status: 'queued', fraction: 0, bytesWritten: 0, totalBytes: sizeBytes, addedAt: Date.now()},
+  ];
+  notifyAndPersist();
   processNext();
 }
 
@@ -194,7 +236,7 @@ export function cancel(descriptor: QueueJobDescriptor): void {
     }
   }
   items = items.filter(i => jobId(i.descriptor) !== id);
-  notify();
+  notifyAndPersist();
 }
 
 /** Re-queues a failed job so it starts over from byte 0. */
@@ -202,10 +244,10 @@ export function retry(descriptor: QueueJobDescriptor): void {
   const id = jobId(descriptor);
   items = items.map(i =>
     jobId(i.descriptor) === id && i.status === 'failed'
-      ? {...i, status: 'queued' as const, error: undefined}
+      ? {...i, status: 'queued' as const, error: undefined, fraction: 0, bytesWritten: 0}
       : i,
   );
-  notify();
+  notifyAndPersist();
   processNext();
 }
 
@@ -217,7 +259,8 @@ async function withHfHeaders(): Promise<Record<string, string> | undefined> {
 
 async function startJob(
   descriptor: QueueJobDescriptor,
-  onProgress: (fraction: number) => void,
+  onProgress: (fraction: number, bytesWritten: number) => void,
+  totalBytes: number,
 ): Promise<{cancel: () => void; completion: Promise<void>}> {
   if (descriptor.kind === 'catalog') {
     const model = getModelById(descriptor.modelId);
@@ -225,7 +268,7 @@ async function startJob(
       throw new Error('Unknown model');
     }
     const headers = await withHfHeaders();
-    return downloadModel(model, fraction => onProgress(fraction), headers);
+    return downloadModel(model, onProgress, headers);
   }
   if (descriptor.kind === 'remote') {
     const headers = await withHfHeaders();
@@ -233,7 +276,7 @@ async function startJob(
       descriptor.modelId,
       descriptor.url,
       descriptor.displayName,
-      fraction => onProgress(fraction),
+      onProgress,
       headers,
     );
   }
@@ -241,7 +284,14 @@ async function startJob(
   if (!translationModel) {
     throw new Error('Unknown translation model');
   }
-  return downloadTranslationModel(translationModel, onProgress);
+  // downloadTranslationModel only reports an aggregated fraction, not real
+  // bytes (it sums across encoder+decoder internally) -- totalBytes is
+  // already known upfront here (resolveSizeBytes, at enqueue time), so
+  // deriving bytesWritten from it is a reasonable approximation rather than
+  // leaving it at 0 throughout, honest about being derived, not measured.
+  return downloadTranslationModel(translationModel, fraction =>
+    onProgress(fraction, Math.round(fraction * totalBytes)),
+  );
 }
 
 /**
@@ -267,7 +317,7 @@ async function processNext(): Promise<void> {
     }
     activeJobId = jobId(next.descriptor);
     items = items.map(i => (i === next ? {...i, status: 'downloading' as const} : i));
-    notify();
+    notifyAndPersist();
     claimed = next;
   } finally {
     claiming = false;
@@ -279,10 +329,14 @@ async function processNext(): Promise<void> {
   const id = activeJobId;
 
   try {
-    const handle = await startJob(claimed.descriptor, fraction => {
-      items = items.map(i => (jobId(i.descriptor) === id ? {...i, fraction} : i));
-      notify();
-    });
+    const handle = await startJob(
+      claimed.descriptor,
+      (fraction, bytesWritten) => {
+        items = items.map(i => (jobId(i.descriptor) === id ? {...i, fraction, bytesWritten} : i));
+        notify();
+      },
+      claimed.totalBytes,
+    );
     activeHandle = handle;
     if (cancelPendingForActiveJob) {
       cancelPendingForActiveJob = false;
@@ -308,7 +362,7 @@ async function processNext(): Promise<void> {
     activeJobId = null;
     activeHandle = null;
     cancelPendingForActiveJob = false;
-    notify();
+    notifyAndPersist();
     processNext();
   }
 }

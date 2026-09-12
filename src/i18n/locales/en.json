@@ -16,7 +16,6 @@
     "title": "Settings",
     "modelInitialization": "Model Initialization Settings",
     "deviceSelection": "Device Selection",
-    "deviceSelectionDescription": "CPU only - No hardware accelerators detected",
     "contextSize": "Context Size",
     "advancedSettings": "Advanced Settings",
     "memorySettings": "Memory Settings",

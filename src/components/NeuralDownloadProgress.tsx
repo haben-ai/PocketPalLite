@@ -1,34 +1,56 @@
 import React, {useEffect, useRef} from 'react';
-import {Animated, StyleSheet, Text, View} from 'react-native';
-import {spacing} from '../theme';
+import {StyleSheet, Text, View} from 'react-native';
+import {radius, spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
 import {PrimaryButton} from './PrimaryButton';
 import {PlayIcon, CloseIcon} from './Icons';
 import {QueueItemStatus} from '../services/downloadQueue';
 
-const NODE_COUNT = 6;
-
-function statusLabel(status: QueueItemStatus, fraction: number, queuePosition?: number): string {
-  switch (status) {
-    case 'queued':
-      return queuePosition ? `Queued (#${queuePosition})` : 'Queued';
-    case 'failed':
-      return 'Failed';
-    default:
-      return `${Math.round(fraction * 100)}%`;
+function formatBytes(bytes: number): string {
+  if (bytes <= 0) {
+    return '0 MB';
   }
+  const gb = bytes / 1e9;
+  if (gb >= 1) {
+    return `${gb.toFixed(2)} GB`;
+  }
+  return `${Math.round(bytes / 1e6)} MB`;
+}
+
+function formatEta(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return '';
+  }
+  if (seconds < 60) {
+    return `${Math.ceil(seconds)}s left`;
+  }
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) {
+    return `About ${minutes} min left`;
+  }
+  return `About ${(minutes / 60).toFixed(1)} hr left`;
 }
 
 /**
- * Download progress rendered as a small chain of "neurons" lighting up and
- * pulsing as the fraction fills, in place of a plain progress bar -- reads
- * as "loading into the model" rather than a generic file-transfer bar.
- * Reflects the download queue's real status (queued/downloading/failed)
- * and offers Retry (on a failed attempt) alongside Cancel.
+ * Download progress: a real horizontal fill bar (a plain width style
+ * recomputed from props on each tick -- cheap, and accurate) plus real
+ * numbers, downloaded/total size and an ETA derived from a locally smoothed
+ * transfer rate. Replaces an earlier "neuron chain" of 6 restarting
+ * Animated.timing calls per progress tick, which added real per-tick
+ * JS-thread animation cost for a purely decorative effect and showed
+ * nothing about actual transfer size or time remaining -- exactly the gap
+ * between this app's download UI and a reference app's (real % + size +
+ * ETA + a keep-the-app-open tip) that prompted this rewrite. No Pause
+ * button: the underlying transfer (RNFS's downloadFile) has no true
+ * Range-resume, so a retry after Cancel/failure always restarts from byte
+ * 0 -- offering a "Pause" that silently re-downloads everything on
+ * "Resume" would be a worse lie than just not having the button.
  */
 export function NeuralDownloadProgress({
   fraction,
   status,
+  bytesWritten,
+  totalBytes,
   queuePosition,
   error,
   onCancel,
@@ -36,6 +58,11 @@ export function NeuralDownloadProgress({
 }: {
   fraction: number;
   status: QueueItemStatus;
+  /** Real bytes transferred so far (downloadQueue.ts's QueueItem.bytesWritten). */
+  bytesWritten: number;
+  /** Resolved size of the whole job (base model + mmproj, if any); 0 when
+   * genuinely unknown (an unresolved remote URL). */
+  totalBytes: number;
   /** 1-based position in the queue, only meaningful while status is
    * 'queued' (a not-yet-started item behind others). */
   queuePosition?: number;
@@ -48,99 +75,82 @@ export function NeuralDownloadProgress({
   onRetry?: () => void;
 }) {
   const {colors, typography} = useTheme();
-  const nodeAnims = useRef(
-    Array.from({length: NODE_COUNT}, () => new Animated.Value(0)),
-  ).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
   const isActive = status === 'downloading';
+  const isFailed = status === 'failed';
+  const isQueued = status === 'queued';
+
+  // Exponential moving average over consecutive progress ticks (0.3 weight
+  // on the newest sample) -- a raw instantaneous delta between two ticks
+  // jumps around too much (network jitter, RNFS's own ~2%-granularity
+  // callback spacing) to read as a stable ETA.
+  const sampleRef = useRef<{bytes: number; at: number} | null>(null);
+  const smoothedRateRef = useRef(0);
 
   useEffect(() => {
-    nodeAnims.forEach((anim, i) => {
-      const threshold = i / (NODE_COUNT - 1);
-      Animated.timing(anim, {
-        toValue: fraction >= threshold ? 1 : 0,
-        duration: 260,
-        useNativeDriver: false,
-      }).start();
-    });
-  }, [fraction, nodeAnims]);
-
-  useEffect(() => {
-    // Only the actively-transferring state pulses -- queued/failed items
-    // sit still so the animation itself communicates "not moving right
-    // now" rather than implying activity that isn't happening.
     if (!isActive) {
-      pulseAnim.setValue(1);
+      sampleRef.current = null;
+      smoothedRateRef.current = 0;
       return;
     }
-    // Must stay JS-driven (useNativeDriver: false), matching the nodes'
-    // backgroundColor interpolation below -- both end up as style props on
-    // the same Animated.View, and RN can't mix a native-driven and a
-    // JS-driven animation on one underlying view (it throws: "Attempting
-    // to run JS driven animation on animated node that has been moved to
-    // native").
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {toValue: 1.4, duration: 480, useNativeDriver: false}),
-        Animated.timing(pulseAnim, {toValue: 1, duration: 480, useNativeDriver: false}),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulseAnim, isActive]);
+    const now = Date.now();
+    const prev = sampleRef.current;
+    if (prev && now > prev.at) {
+      const instantRate = Math.max(0, ((bytesWritten - prev.bytes) / (now - prev.at)) * 1000);
+      smoothedRateRef.current =
+        smoothedRateRef.current === 0 ? instantRate : smoothedRateRef.current * 0.7 + instantRate * 0.3;
+    }
+    sampleRef.current = {bytes: bytesWritten, at: now};
+  }, [bytesWritten, isActive]);
 
-  // The node at the current leading edge pulses, like a neuron actively
-  // firing, distinguishing "still filling" from the already-lit nodes
-  // behind it.
-  const activeIndex =
-    !isActive || fraction >= 1
-      ? -1
-      : Math.min(NODE_COUNT - 1, Math.floor(fraction * (NODE_COUNT - 1)));
+  const remaining = Math.max(0, totalBytes - bytesWritten);
+  const eta = smoothedRateRef.current > 0 ? formatEta(remaining / smoothedRateRef.current) : '';
+  const pct = Math.round(fraction * 100);
 
-  const canRetry = status === 'failed' && !!onRetry;
+  let title: string;
+  if (isQueued) {
+    title = queuePosition ? `Queued (#${queuePosition})` : 'Queued';
+  } else if (isFailed) {
+    title = 'Download failed';
+  } else {
+    title = `Downloading... ${pct}%`;
+  }
+
+  const subtitle = isFailed
+    ? error
+    : isQueued
+    ? 'Waiting for the current download to finish'
+    : totalBytes > 0
+    ? `${formatBytes(bytesWritten)} / ${formatBytes(totalBytes)}${eta ? ` · ${eta}` : ''}`
+    : formatBytes(bytesWritten);
+
+  const canRetry = isFailed && !!onRetry;
 
   return (
     <View style={styles.container}>
-      <View style={styles.chain}>
-        {nodeAnims.map((anim, i) => (
-          <React.Fragment key={i}>
-            {i > 0 && (
-              <Animated.View
-                style={[
-                  styles.line,
-                  {
-                    backgroundColor: nodeAnims[i - 1].interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [colors.outline, colors.accent],
-                    }),
-                  },
-                ]}
-              />
-            )}
-            <Animated.View
-              style={[
-                styles.node,
-                {
-                  backgroundColor: anim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [colors.outline, colors.accent],
-                  }),
-                  transform: [{scale: i === activeIndex ? pulseAnim : 1}],
-                },
-              ]}
-            />
-          </React.Fragment>
-        ))}
+      <Text style={[typography.body, styles.title, isFailed && {color: colors.danger}]} numberOfLines={1}>
+        {title}
+      </Text>
+      <View style={[styles.track, {backgroundColor: colors.surfaceContainerHigh}]}>
+        <View
+          style={[
+            styles.fill,
+            {
+              width: `${isFailed ? 0 : Math.max(2, pct)}%`,
+              backgroundColor: isFailed ? colors.danger : colors.accent,
+            },
+          ]}
+        />
       </View>
       <Text
-        style={[
-          typography.small,
-          styles.label,
-          status === 'failed' && {color: colors.danger},
-        ]}
-        numberOfLines={status === 'failed' ? 2 : 1}>
-        {status === 'failed' && error ? error : statusLabel(status, fraction, queuePosition)}
+        style={[typography.small, {color: isFailed ? colors.danger : colors.textMuted}]}
+        numberOfLines={isFailed ? 2 : 1}>
+        {subtitle}
       </Text>
+      {isActive && (
+        <Text style={[typography.small, styles.tip, {color: colors.textMuted}]} numberOfLines={1}>
+          Keep the app open to avoid interrupting the download.
+        </Text>
+      )}
       <View style={styles.actions}>
         {canRetry && (
           <PrimaryButton
@@ -164,11 +174,11 @@ export function NeuralDownloadProgress({
 }
 
 const styles = StyleSheet.create({
-  container: {gap: spacing.xs},
-  chain: {flexDirection: 'row', alignItems: 'center', height: 16},
-  node: {width: 10, height: 10, borderRadius: 5},
-  line: {flex: 1, height: 2, marginHorizontal: 3, borderRadius: 1},
-  label: {textAlign: 'center'},
-  actions: {flexDirection: 'row', gap: spacing.xs, marginTop: 2},
+  container: {gap: 4},
+  title: {fontWeight: '600'},
+  track: {height: 6, borderRadius: radius.pill, overflow: 'hidden'},
+  fill: {height: '100%', borderRadius: radius.pill},
+  tip: {fontStyle: 'italic'},
+  actions: {flexDirection: 'row', gap: spacing.xs, marginTop: 4},
   actionButton: {flex: 1},
 });

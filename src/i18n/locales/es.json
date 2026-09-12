@@ -16,7 +16,6 @@
     "title": "Configuración",
     "modelInitialization": "Configuración de inicialización del modelo",
     "deviceSelection": "Selección de dispositivo",
-    "deviceSelectionDescription": "Solo CPU - No se detectaron aceleradores de hardware",
     "contextSize": "Tamaño de contexto",
     "advancedSettings": "Configuración avanzada",
     "memorySettings": "Configuración de memoria",

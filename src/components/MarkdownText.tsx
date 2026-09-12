@@ -1,5 +1,5 @@
 import React, {useMemo, useState} from 'react';
-import {ScrollView, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import {radius, spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
@@ -11,19 +11,26 @@ type Block =
   | {type: 'list-item'; ordered: boolean; marker: string; text: string}
   | {type: 'paragraph'; text: string};
 
-type InlineSpan = {text: string; bold?: boolean; italic?: boolean; code?: boolean};
+type InlineSpan = {text: string; bold?: boolean; italic?: boolean; code?: boolean; link?: string};
 
 const CODE_FENCE = /```[^\n`]*\n([\s\S]*?)```/g;
 const HEADING_LINE = /^(#{1,6})\s+(.*)$/;
 const LIST_LINE = /^\s*([-*+]|\d+[.)])\s+(.*)$/;
-// The first two alternatives (bold-wrapped inline code, e.g. Gemma's own
-// `**`count = 0`**: ...` list-item style) must come before the plain code
-// and plain bold alternatives -- matched as one atomic token, otherwise the
-// bold delimiters and the code delimiters get split into separate matches
-// that can't be recombined, leaving literal `**`/backtick characters
-// visible around the code chip.
+// Trailing punctuation a bare URL match would otherwise swallow when it sits
+// at the end of a sentence (e.g. "see https://x.com." shouldn't link the
+// period) -- stripped off and re-emitted as plain text after the link span.
+const URL_TRAILING_PUNCT = /[.,;:!?)\]}'"]+$/;
+// Link alternatives come first: a markdown link or bare URL containing `_`/
+// `*` (common in query strings/paths) must be consumed whole before the
+// italic/bold alternatives below get a chance to misread those characters
+// as emphasis markers. The first two *code* alternatives (bold-wrapped
+// inline code, e.g. Gemma's own `**`count = 0`**: ...` list-item style)
+// must come before the plain code and plain bold alternatives -- matched as
+// one atomic token, otherwise the bold delimiters and the code delimiters
+// get split into separate matches that can't be recombined, leaving literal
+// `**`/backtick characters visible around the code chip.
 const INLINE_TOKEN =
-  /(\*\*`[^`]+`\*\*)|(__`[^`]+`__)|(`[^`]+`)|(\*\*[^*]+\*\*)|(__[^_]+__)|(\*[^*\n]+\*)|(_[^_\n]+_)/g;
+  /(\[[^\]]+\]\(https?:\/\/[^\s)]+\))|(https?:\/\/[^\s<>"')\]]+)|(\*\*`[^`]+`\*\*)|(__`[^`]+`__)|(`[^`]+`)|(\*\*[^*]+\*\*)|(__[^_]+__)|(\*[^*\n]+\*)|(_[^_\n]+_)/g;
 
 /**
  * Splits message text into ```-fenced code segments (kept verbatim, a
@@ -95,7 +102,21 @@ function parseInline(text: string): InlineSpan[] {
       spans.push({text: text.slice(lastIndex, start)});
     }
     const token = match[0];
-    if (token.startsWith('**`') || token.startsWith('__`')) {
+    if (token.startsWith('[')) {
+      const linkMatch = token.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);
+      if (linkMatch) {
+        spans.push({text: linkMatch[1], link: linkMatch[2]});
+      } else {
+        spans.push({text: token});
+      }
+    } else if (token.startsWith('http://') || token.startsWith('https://')) {
+      const trailingMatch = token.match(URL_TRAILING_PUNCT);
+      const url = trailingMatch ? token.slice(0, -trailingMatch[0].length) : token;
+      spans.push({text: url, link: url});
+      if (trailingMatch) {
+        spans.push({text: trailingMatch[0]});
+      }
+    } else if (token.startsWith('**`') || token.startsWith('__`')) {
       // Bold-wrapped code: render as a code chip -- the code styling
       // already reads as visually distinct, so the redundant bold doesn't
       // need its own treatment on top of it.
@@ -120,28 +141,43 @@ function InlineText({
   color,
   codeColor,
   codeBg,
+  linkColor,
 }: {
   text: string;
   color: string;
   codeColor: string;
   codeBg: string;
+  linkColor: string;
 }) {
   const spans = useMemo(() => parseInline(text), [text]);
   return (
     <Text style={[styles.paragraph, {color}]}>
-      {spans.map((span, i) =>
-        span.code ? (
-          <Text
-            key={i}
-            style={[styles.inlineCode, {color: codeColor, backgroundColor: codeBg}]}>
-            {span.text}
-          </Text>
-        ) : (
+      {spans.map((span, i) => {
+        if (span.link) {
+          return (
+            <Text
+              key={i}
+              style={[styles.link, {color: linkColor}]}
+              onPress={() => Linking.openURL(span.link!)}>
+              {span.text}
+            </Text>
+          );
+        }
+        if (span.code) {
+          return (
+            <Text
+              key={i}
+              style={[styles.inlineCode, {color: codeColor, backgroundColor: codeBg}]}>
+              {span.text}
+            </Text>
+          );
+        }
+        return (
           <Text key={i} style={[span.bold && styles.bold, span.italic && styles.italic]}>
             {span.text}
           </Text>
-        ),
-      )}
+        );
+      })}
     </Text>
   );
 }
@@ -220,6 +256,7 @@ export function MarkdownText({content, color}: {content: string; color: string})
                   color={color}
                   codeColor={colors.textPrimary}
                   codeBg={colors.surfaceContainerHigh}
+                  linkColor={colors.accent}
                 />
               </View>
             </View>
@@ -233,6 +270,7 @@ export function MarkdownText({content, color}: {content: string; color: string})
             color={color}
             codeColor={colors.textPrimary}
             codeBg={colors.surfaceContainerHigh}
+            linkColor={colors.accent}
           />
         );
       })}
@@ -244,6 +282,7 @@ const styles = StyleSheet.create({
   paragraph: {fontSize: 15, lineHeight: 23, marginVertical: 2},
   bold: {fontWeight: '700'},
   italic: {fontStyle: 'italic'},
+  link: {textDecorationLine: 'underline'},
   inlineCode: {
     fontSize: 13.5,
     borderRadius: 4,

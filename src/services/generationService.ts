@@ -22,3 +22,17 @@ export function stopGeneratingInBackground(): void {
     GenerationService?.stopGenerating();
   }
 }
+
+/**
+ * Posts a dismissible "reply ready" notification titled with the user's own
+ * question, via GenerationServiceModule.showCompletionNotification (see its
+ * doc comment). Callers are expected to only call this when the app is
+ * actually backgrounded (AppState.currentState !== 'active') -- calling it
+ * while foregrounded would just be a redundant notification for something
+ * already visible on screen.
+ */
+export function showCompletionNotification(question: string): void {
+  if (Platform.OS === 'android') {
+    GenerationService?.showCompletionNotification(question);
+  }
+}

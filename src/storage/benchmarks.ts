@@ -10,12 +10,27 @@ export type BenchmarkModelSettings = {
   nBatch: number;
   nUbatch: number;
   nThreads: number;
-  /** Always 0 on Android in this app -- llama.rn's n_gpu_layers is
-   * iOS-only, deliberately left unexposed as a setting on Android. */
+  /** The requested n_gpu_layers (99 when GPU Acceleration is on in
+   * Settings, 0 when off) -- genuinely read by llama.cpp on both Android
+   * (OpenCL, Adreno-gated) and iOS (Metal). This is the *request*; see
+   * BenchmarkRun.gpuStatus for what the native backend actually did with
+   * it, and BenchmarkResultMetrics.nGpuLayersActual for the real count used
+   * during the timed run. */
   gpuLayers: number;
   flashAttnType: 'auto' | 'on' | 'off';
   cacheTypeK: CacheType;
   cacheTypeV: CacheType;
+};
+
+/** Real per-run acceleration status -- see llamaSession.ts's GpuStatus doc
+ * comment for exactly where each field comes from natively. Kept as its own
+ * type here (rather than importing GpuStatus directly) so this storage
+ * schema doesn't depend on llamaSession's module graph. */
+export type BenchmarkGpuStatus = {
+  active: boolean;
+  device?: string;
+  reasonInactive: string;
+  androidLib?: string;
 };
 
 export type BenchmarkConfig = {
@@ -35,6 +50,10 @@ export type BenchmarkResultMetrics = {
    * API exists at the JS level), but real measured samples, not a guess. */
   peakMemoryBytes: number;
   totalMemoryBytes: number;
+  /** llama.cpp's own bench harness's real nGpuLayers field (from
+   * BenchResult) -- the actual layer count used during this specific timed
+   * run, not just the request sent at context init. */
+  nGpuLayersActual: number;
 };
 
 export type BenchmarkRun = {
@@ -49,6 +68,10 @@ export type BenchmarkRun = {
   config: BenchmarkConfig;
   modelSettings: BenchmarkModelSettings;
   metrics: BenchmarkResultMetrics;
+  /** Real acceleration status for this run. Optional because runs saved
+   * before this field existed won't have it -- BenchmarkScreen falls back
+   * to an "unknown" display rather than assuming either state for those. */
+  gpuStatus?: BenchmarkGpuStatus;
   createdAt: number;
 };
 

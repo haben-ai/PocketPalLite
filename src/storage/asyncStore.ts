@@ -11,6 +11,7 @@ const KEYS = {
   benchmarkRuns: 'pocketpal:benchmark_runs',
   downloadQueue: 'pocketpal:download_queue',
   deviceTier: 'pocketpal:device_tier',
+  lastScreen: 'pocketpal:last_screen',
 };
 
 export {KEYS};

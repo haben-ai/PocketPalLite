@@ -9,6 +9,10 @@
     <!-- Android 13+ requires this before a foreground service's own
          notification can actually be shown to the user. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- ChatScreen's completion haptic (Vibration.vibrate()) needs this:
+         a normal (non-dangerous) permission, granted automatically at
+         install, no runtime prompt. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
       android:name=".MainApplication"

@@ -22,6 +22,60 @@ export type ContextInitOptions = {
   gpuOffloadEnabled?: boolean;
 };
 
+/**
+ * Real per-load acceleration status, read directly off the fields llama.rn's
+ * native layer already computes and returns from initContext (LlamaContext's
+ * own gpu/gpuDevice/reasonNoGPU/androidLib properties -- see
+ * LlamaContext.java's isGpuEnabled()/getReasonNoGpu()/getGpuDevice() on
+ * Android and RNLlamaContext.mm's isMetalEnabled/reasonNoMetal on iOS,
+ * unified into the same three JS fields on both platforms). Not a guess or
+ * a JS-side inference from the request -- this is what the native backend
+ * actually did with it.
+ */
+export type GpuStatus = {
+  active: boolean;
+  device?: string;
+  reasonInactive: string;
+  /** Android only -- the specific .so variant that got loaded (e.g.
+   * "rnllama_jni_v8_2_dotprod_i8mm_opencl" when GPU-accelerated,
+   * "rnllama_jni_v8_2_dotprod_i8mm" when not). Undefined on iOS, which has
+   * no equivalent concept (one xcframework, Metal picked at runtime). */
+  androidLib?: string;
+};
+
+function readGpuStatus(ctx: LlamaContext): GpuStatus {
+  return {
+    active: ctx.gpu,
+    device: ctx.gpuDevice,
+    reasonInactive: ctx.reasonNoGPU,
+    androidLib: ctx.androidLib,
+  };
+}
+
+let lastKnownGpuStatus: GpuStatus | null = null;
+
+function logGpuStatus(ctx: LlamaContext): void {
+  const status = readGpuStatus(ctx);
+  lastKnownGpuStatus = status;
+  console.log(
+    '[llamaSession] GPU acceleration:',
+    status.active ? `ACTIVE (${status.device ?? 'unknown device'})` : `inactive (${status.reasonInactive})`,
+    status.androidLib ? `-- native lib: ${status.androidLib}` : '',
+  );
+}
+
+/**
+ * The real acceleration status from the most recent model load this
+ * session, or null if no model has loaded yet. GPU status is inherently
+ * per-context (only known once llama.cpp has actually tried to init a
+ * backend), so this can't be answered before that first happens -- callers
+ * (Settings' "Device Selection" row) show a neutral "not detected yet"
+ * state for null rather than guessing.
+ */
+export function getLastKnownGpuStatus(): GpuStatus | null {
+  return lastKnownGpuStatus;
+}
+
 async function getOrInitContext(
   modelId: string,
   filePath: string,
@@ -67,14 +121,18 @@ async function getOrInitContext(
         model: filePath,
         n_ctx: contextSize,
         n_threads: nThreads,
-        // llama.rn auto-selects an OpenCL-accelerated native library on
-        // Adreno-GPU Android devices (see LlamaContext.java's static
-        // loadLibrary block), and n_gpu_layers is genuinely wired through
-        // to llama.cpp on Android (jni.cpp reads it from the JS params) --
-        // not iOS-only. 99 requests "offload every layer that fits"; on a
-        // device/model where no GPU backend is available or engaged,
-        // llama.cpp silently falls back to CPU, so this is safe to always
-        // request rather than needing per-device detection here.
+        // Real hardware-acceleration request, not iOS-only: on Android,
+        // llama.rn auto-selects an OpenCL-accelerated native library when
+        // LlamaContext.java's own device check (Adreno/Qualcomm string
+        // match) succeeds; on iOS, RNLlamaContext.mm compiles with Metal
+        // (LM_GGML_USE_METAL) and checks MTLGPUFamilyApple7 support at
+        // runtime. Either way n_gpu_layers is genuinely read by llama.cpp
+        // (jni.cpp on Android, the .mm context on iOS) -- 99 requests
+        // "offload every layer that fits"; on a device/model where no GPU
+        // backend is available or engaged, llama.cpp silently falls back to
+        // CPU, so this is safe to always request rather than needing
+        // per-device detection here. logGpuStatus() below reports what
+        // actually happened, not just what was requested.
         n_gpu_layers: gpuOffloadEnabled ? 99 : 0,
         use_mlock: useMlock,
         use_mmap: useMmap,
@@ -92,6 +150,7 @@ async function getOrInitContext(
       },
       onProgress,
     );
+    logGpuStatus(ctx);
     if (mmprojPath) {
       await ctx.initMultimodal({path: mmprojPath, use_gpu: false});
     }
@@ -135,6 +194,11 @@ export type BenchmarkOutcome = {
    * field) -- includes the actual parameter count (nParams), not the
    * catalog's rounded "1B"-style label. */
   model: LlamaContext['model'];
+  /** Real acceleration status for this run -- see GpuStatus's doc comment.
+   * result.nGpuLayers (from llama.cpp's own bench harness) is the actual
+   * layer count used during the timed run, which is what "GPU layer usage"
+   * means here, not just the request sent at init. */
+  gpuStatus: GpuStatus;
 };
 
 /**
@@ -155,7 +219,7 @@ export async function runBenchmark(
 ): Promise<BenchmarkOutcome> {
   const ctx = await getOrInitContext(modelId, filePath, mmprojPath, onModelLoadProgress, initOptions);
   const result = await ctx.bench(params.pp, params.tg, params.pl, params.nr);
-  return {result, model: ctx.model};
+  return {result, model: ctx.model, gpuStatus: readGpuStatus(ctx)};
 }
 
 /**

@@ -34,6 +34,8 @@ import {SlidersIcon} from '../components/Icons';
 type ModelCardDownloadState = {
   fraction: number;
   status: QueueItem['status'];
+  bytesWritten: number;
+  totalBytes: number;
   queuePosition?: number;
   error?: string;
   cancel: () => void;
@@ -163,6 +165,8 @@ export function ModelsTabScreen({highlightModelId, onNavigate}: Props) {
     return {
       fraction: item.fraction,
       status: item.status,
+      bytesWritten: item.bytesWritten,
+      totalBytes: item.totalBytes,
       queuePosition: queuedPosition(item),
       error: item.error,
       cancel: () => downloadQueue.cancel(item.descriptor),

@@ -79,6 +79,8 @@ export function ModelCard({
   downloadState?: {
     fraction: number;
     status: QueueItemStatus;
+    bytesWritten: number;
+    totalBytes: number;
     queuePosition?: number;
     error?: string;
     cancel: () => void;
@@ -190,6 +192,8 @@ export function ModelCard({
         <NeuralDownloadProgress
           fraction={downloadState.fraction}
           status={downloadState.status}
+          bytesWritten={downloadState.bytesWritten}
+          totalBytes={downloadState.totalBytes}
           queuePosition={downloadState.queuePosition}
           error={downloadState.error}
           onCancel={downloadState.cancel}

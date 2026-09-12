@@ -1,8 +1,9 @@
 import React, {useEffect, useState} from 'react';
 import {AppState, PermissionsAndroid, Platform, View} from 'react-native';
-import {hasSeenOnboarding, setOnboardingSeen} from './src/storage/asyncStore';
+import {getJSON, hasSeenOnboarding, KEYS, setOnboardingSeen} from './src/storage/asyncStore';
 import {OnboardingScreen} from './src/screens/OnboardingScreen';
 import {RootNavigator} from './src/navigation/RootNavigator';
+import {AppScreen} from './src/navigation/types';
 import {ensureBuiltInPersonaSeeded} from './src/storage/personas';
 import {getAppSettings, ensureNThreadsTuned} from './src/storage/appSettings';
 import {releaseActiveContext} from './src/services/llamaSession';
@@ -14,6 +15,7 @@ type Route = {screen: 'loading'} | {screen: 'onboarding'} | {screen: 'app'};
 
 export default function App() {
   const [route, setRoute] = useState<Route>({screen: 'loading'});
+  const [initialScreen, setInitialScreen] = useState<AppScreen | undefined>(undefined);
 
   useEffect(() => {
     (async () => {
@@ -28,6 +30,11 @@ export default function App() {
       const settings = await getAppSettings();
       initI18n(settings.language);
       const seen = await hasSeenOnboarding();
+      // Restores the screen/chat the user was last on, so a cold start
+      // after Android kills the backgrounded process (rather than a normal
+      // minimize, where in-memory state already survives on its own) still
+      // reopens where they left off instead of a blank new chat.
+      setInitialScreen(await getJSON<AppScreen | undefined>(KEYS.lastScreen, undefined));
       setRoute({screen: seen ? 'app' : 'onboarding'});
 
       // Device analysis runs exactly once, ever -- not on every visit to
@@ -95,7 +102,7 @@ export default function App() {
           }}
         />
       ) : (
-        <RootNavigator />
+        <RootNavigator initialScreen={initialScreen} />
       )}
     </ThemeProvider>
   );

@@ -107,11 +107,16 @@ function Stepper({
  * a local history of results. Every number shown is either a direct field
  * from the native BenchResult, real GGUF metadata (model.nParams), or a
  * sampled measurement (peak memory, via polling DeviceInfo during the
- * run) -- nothing here is a placeholder or invented figure. GPU Layers
- * reflects the real request sent to llama.cpp (99 when GPU Acceleration is
- * on in Settings, 0 when off) -- llama.rn genuinely offloads to the device
- * GPU on Android via an auto-selected OpenCL native library on Adreno
- * devices, it's not iOS-only.
+ * run) -- nothing here is a placeholder or invented figure. "GPU Layers
+ * Requested" is what got sent to llama.cpp (99 when GPU Acceleration is on
+ * in Settings, 0 when off); the "Backend" line below it is what the native
+ * layer actually did with that request (llamaSession.ts's GpuStatus,  read
+ * straight off LlamaContext's own gpu/gpuDevice/reasonNoGPU/androidLib
+ * fields) -- Android via an auto-selected OpenCL native library on
+ * Adreno-only devices, iOS via Metal. On a device with neither (e.g. a
+ * Mali/PowerVR/other non-Adreno Android GPU), the backend genuinely falls
+ * back to CPU regardless of the request, which this screen now shows
+ * honestly instead of just repeating the request back.
  */
 export function BenchmarkScreen({onNavigate}: Props) {
   const {colors, typography} = useTheme();
@@ -230,7 +235,9 @@ export function BenchmarkScreen({onNavigate}: Props) {
           totalTimeSeconds: outcome.result.t,
           peakMemoryBytes,
           totalMemoryBytes,
+          nGpuLayersActual: outcome.result.nGpuLayers,
         },
+        gpuStatus: outcome.gpuStatus,
         createdAt: Date.now(),
       };
       await addBenchmarkRun(run);
@@ -407,11 +414,25 @@ export function BenchmarkScreen({onNavigate}: Props) {
               {run.modelSettings.nUbatch}
             </Text>
             <Text style={[typography.caption, styles.configLine]}>
-              CPU Threads: {run.modelSettings.nThreads} • GPU Layers: {run.modelSettings.gpuLayers}
+              CPU Threads: {run.modelSettings.nThreads} • GPU Layers Requested:{' '}
+              {run.modelSettings.gpuLayers}
             </Text>
             <Text style={[typography.caption, styles.configLine]}>
               Flash Attention {run.modelSettings.flashAttnType === 'off' ? 'Disabled' : 'Enabled'} •
               Cache Types: {run.modelSettings.cacheTypeK}/{run.modelSettings.cacheTypeV}
+            </Text>
+            <Text
+              style={[
+                typography.caption,
+                styles.configLine,
+                {color: run.gpuStatus?.active ? colors.success : colors.textSecondary},
+              ]}>
+              Backend:{' '}
+              {run.gpuStatus === undefined
+                ? 'Unknown (run predates backend tracking)'
+                : run.gpuStatus.active
+                ? `GPU active (${run.gpuStatus.device ?? 'unknown device'}) • ${run.metrics.nGpuLayersActual} layers offloaded`
+                : `CPU only (${run.gpuStatus.reasonInactive || 'no supported GPU backend'})`}
             </Text>
 
             <View style={[styles.metricsTile, {backgroundColor: colors.surfaceContainerHigh}]}>

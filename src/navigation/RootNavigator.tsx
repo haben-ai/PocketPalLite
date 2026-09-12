@@ -1,6 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import {BackHandler, View} from 'react-native';
 import {useTheme} from '../theme/ThemeContext';
+import {KEYS, setJSON} from '../storage/asyncStore';
 import {AppScreen} from './types';
 import {ChatTabScreen} from '../screens/ChatTabScreen';
 import {ModelsTabScreen} from '../screens/ModelsTabScreen';
@@ -21,9 +22,27 @@ import {BottomTabBar} from '../components/BottomTabBar';
  * avoid being covered. "More" covers Discover/Benchmark/Settings/App Info,
  * which don't get their own tab slot.
  */
-export function RootNavigator() {
+export function RootNavigator({initialScreen}: {initialScreen?: AppScreen}) {
   const {colors} = useTheme();
-  const [screen, setScreen] = useState<AppScreen>({name: 'chat'});
+  const [screen, setScreen] = useState<AppScreen>(initialScreen ?? {name: 'chat'});
+
+  // Persists whenever the user navigates, so a cold start after Android
+  // kills the backgrounded process (not just a normal minimize, where the
+  // JS context and this state survive on their own) still reopens on the
+  // same screen/chat instead of resetting to a blank new chat. Transient,
+  // one-shot navigation params (prefillText/highlightModelId) are stripped
+  // before persisting -- replaying those on a later cold start would
+  // re-trigger their one-time effect (re-prefilling old text, re-scrolling
+  // to a model) rather than just restoring "where you were".
+  useEffect(() => {
+    let toPersist: AppScreen = screen;
+    if (screen.name === 'chat' && screen.prefillText) {
+      toPersist = {...screen, prefillText: undefined};
+    } else if (screen.name === 'models' && screen.highlightModelId) {
+      toPersist = {...screen, highlightModelId: undefined};
+    }
+    setJSON(KEYS.lastScreen, toPersist).catch(() => undefined);
+  }, [screen]);
 
   // Without this, Android's hardware back button has no in-app screen
   // stack to pop -- since `screen` just gets fully replaced rather than

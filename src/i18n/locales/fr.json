@@ -16,7 +16,6 @@
     "title": "Paramètres",
     "modelInitialization": "Paramètres d'initialisation du modèle",
     "deviceSelection": "Sélection de l'appareil",
-    "deviceSelectionDescription": "CPU uniquement - Aucun accélérateur matériel détecté",
     "contextSize": "Taille du contexte",
     "advancedSettings": "Paramètres avancés",
     "memorySettings": "Paramètres de mémoire",

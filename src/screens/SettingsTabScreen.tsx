@@ -6,6 +6,7 @@ import {useTheme, useThemeContext} from '../theme/ThemeContext';
 import {SUPPORTED_LANGUAGES} from '../i18n';
 import {LanguagePicker} from '../components/LanguagePicker';
 import {AppSettings, CacheType, getAppSettings, setAppSettings} from '../storage/appSettings';
+import {getLastKnownGpuStatus, GpuStatus} from '../services/llamaSession';
 import {DownloadedModel} from '../types';
 import {
   getDownloadedModels,
@@ -28,6 +29,25 @@ type SubView = 'main' | 'translation-test';
 
 const CONTEXT_SIZE_OPTIONS = [512, 1024, 2048, 4096];
 const CACHE_TYPE_OPTIONS: CacheType[] = ['f16', 'f32', 'q8_0', 'q4_0', 'q4_1', 'iq4_nl', 'q5_0', 'q5_1'];
+
+/**
+ * Replaces what used to be a hardcoded "CPU only - No hardware accelerators
+ * detected" string (settings.deviceSelectionDescription) that was shown
+ * unconditionally regardless of the real device -- on an Adreno phone with
+ * GPU offload genuinely active, that string would have been flatly false.
+ * GPU status is only known once a model has actually loaded this session
+ * (see getLastKnownGpuStatus's doc comment), so this has an honest neutral
+ * state for "haven't loaded a model yet" rather than guessing either way.
+ */
+function formatGpuStatusDescription(status: GpuStatus | null): string {
+  if (!status) {
+    return 'Not yet detected -- load a model to check for GPU acceleration.';
+  }
+  if (status.active) {
+    return `GPU active (${status.device ?? 'unknown device'})`;
+  }
+  return `CPU only -- ${status.reasonInactive || 'no supported GPU backend detected'}`;
+}
 
 function SliderSetting({
   label,
@@ -264,7 +284,7 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
         <SettingRow
           bare
           label={t('settings.deviceSelection')}
-          description={t('settings.deviceSelectionDescription')}
+          description={formatGpuStatusDescription(getLastKnownGpuStatus())}
           control={<View />}
         />
         <SettingRow

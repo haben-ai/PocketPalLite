@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  Vibration,
   View,
 } from 'react-native';
 import {pick, isErrorWithCode, errorCodes} from '@react-native-documents/picker';
@@ -43,7 +44,11 @@ import {
   createConversation,
 } from '../storage/conversations';
 import {getInferenceEngine, getActiveModelId} from '../services/llamaSession';
-import {startGeneratingInBackground, stopGeneratingInBackground} from '../services/generationService';
+import {
+  startGeneratingInBackground,
+  stopGeneratingInBackground,
+  showCompletionNotification,
+} from '../services/generationService';
 import {InferenceEngine} from '../services/inferenceEngine';
 import {truncateMessagesToContext, estimateTextTokens} from '../services/contextWindow';
 import {getLanguagePipeline, DEFAULT_LANGUAGE} from '../services/languagePipeline';
@@ -319,6 +324,18 @@ export function ChatScreen({
   };
 
   /**
+   * Surfaces a "reply ready" notification titled with the user's own
+   * question -- only when they're not already looking at it, same as
+   * ChatGPT only pushes a notification for a reply you weren't watching
+   * stream in live.
+   */
+  const notifyIfBackgrounded = (question: string) => {
+    if (AppState.currentState !== 'active') {
+      showCompletionNotification(question);
+    }
+  };
+
+  /**
    * Shared by handleSend/handleRegenerate/the edit-submit path: takes the
    * message list to persist (already includes the user turn, if any) plus
    * the ChatMessage whose content is actually sent to the model this turn
@@ -453,6 +470,11 @@ export function ChatScreen({
       if (settings.ttsEnabled) {
         speak(assistantMessage.content);
       }
+      // A short, single-pulse tap -- ChatGPT's own completion haptic is
+      // similarly light, not a long buzz. Fires regardless of foreground/
+      // background state, same as ChatGPT's in-app haptic.
+      Vibration.vibrate(40);
+      notifyIfBackgrounded(userMessage.content);
     } catch (err: any) {
       setStreamingText(null);
       const partial = streamingTextRef.current;
@@ -474,6 +496,12 @@ export function ChatScreen({
       const finalMessages = [...nextMessages, assistantMessage];
       setMessages(finalMessages);
       await saveMessages(conversationId, finalMessages);
+      // A user-initiated Stop has no background trigger today (the control
+      // only exists on-screen), so only a genuine error is worth surfacing
+      // to a backgrounded user here.
+      if (!stoppedRef.current) {
+        notifyIfBackgrounded(userMessage.content);
+      }
     } finally {
       stopGeneratingInBackground();
     }

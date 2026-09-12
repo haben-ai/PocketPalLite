@@ -117,6 +117,30 @@ export const MODEL_CATALOG: ModelInfo[] = [
     version: '1',
     sha256: 'd2422a66532f23c21c0ffd05d21ec05200c33009fad61402bb99125be34983c6',
   },
+  {
+    id: 'smolvlm-500m',
+    name: 'SmolVLM 500M Instruct',
+    tier: 'weak',
+    vendor: 'other',
+    params: '500M',
+    quant: 'Q8_0',
+    sizeBytes: 436806912,
+    fileName: 'smolvlm-500m.gguf',
+    capability: 'vision',
+    description:
+      "A compact vision-language model from Hugging Face's SmolVLM family -- can see and describe attached images, not just read text. Small enough to run smoothly on most phones.",
+    repoUrl: 'https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF',
+    downloadUrl:
+      'https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF/resolve/main/SmolVLM-500M-Instruct-Q8_0.gguf',
+    minRamGB: 2,
+    version: '1',
+    sha256: '9d4612de6a42214499e301494a3ecc2be0abdd9de44e663bda63f1152fad1bf4',
+    mmprojUrl:
+      'https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-500M-Instruct-Q8_0.gguf',
+    mmprojFileName: 'smolvlm-500m-mmproj.gguf',
+    mmprojSizeBytes: 108783360,
+    mmprojSha256: 'd1eb8b6b23979205fdf63703ed10f788131a3f812c7b1f72e0119d5d81295150',
+  },
 ];
 
 export const getModelById = (id: string): ModelInfo | undefined =>
