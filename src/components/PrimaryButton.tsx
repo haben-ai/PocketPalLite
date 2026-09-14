@@ -4,6 +4,7 @@ import {
   Animated,
   StyleSheet,
   Text,
+  TextStyle,
   TouchableOpacity,
   ViewStyle,
 } from 'react-native';
@@ -22,6 +23,9 @@ type Props = {
    * an icon alone conveys nothing to them. Receives the same color the
    * text label would have used, so it stays legible across variants. */
   icon?: (color: string) => React.ReactNode;
+  /** Overrides the label's font -- e.g. onboarding's Nunito Sans, which
+   * every other call site leaves unset and keeps the app's default. */
+  labelStyle?: TextStyle;
 };
 
 export function PrimaryButton({
@@ -32,6 +36,7 @@ export function PrimaryButton({
   loading,
   style,
   icon,
+  labelStyle,
 }: Props) {
   const scale = useRef(new Animated.Value(1)).current;
   const {colors} = useTheme();
@@ -71,7 +76,7 @@ export function PrimaryButton({
         ) : icon ? (
           icon(textColor)
         ) : (
-          <Text style={[styles.label, {color: textColor}]}>{label}</Text>
+          <Text style={[styles.label, {color: textColor}, labelStyle]}>{label}</Text>
         )}
       </Animated.View>
     </TouchableOpacity>

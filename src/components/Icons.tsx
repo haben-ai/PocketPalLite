@@ -4,6 +4,7 @@ import {
   ArrowUpFromLine,
   Check,
   ChevronDown,
+  ChevronRight,
   CloudDownload,
   Copy,
   Download,
@@ -26,6 +27,7 @@ import {
   Settings,
   SlidersHorizontal,
   Sparkles,
+  Star,
   ThumbsDown,
   ThumbsUp,
   Trash,
@@ -87,6 +89,12 @@ export const OffloadIcon = ({size = SMALL_SIZE + 2, color}: IconProps) => (
 );
 export const ChevronDownIcon = ({size = SIZE, color}: IconProps) => (
   <ChevronDown size={size} color={color} />
+);
+export const ChevronRightIcon = ({size = SIZE, color}: IconProps) => (
+  <ChevronRight size={size} color={color} />
+);
+export const StarIcon = ({size = SMALL_SIZE, color}: IconProps) => (
+  <Star size={size} color={color} fill={color} />
 );
 export const DownloadIcon = ({size = SIZE, color}: IconProps) => <Download size={size} color={color} />;
 export const PauseIcon = ({size = SIZE, color}: IconProps) => <Pause size={size} color={color} />;

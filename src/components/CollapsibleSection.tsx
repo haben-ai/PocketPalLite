@@ -1,7 +1,8 @@
-import React, {useState} from 'react';
-import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import React, {useEffect, useRef, useState} from 'react';
+import {Animated, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
+import {ChevronDownIcon} from './Icons';
 
 /**
  * A titled section that can be collapsed to just its header -- used by the
@@ -24,6 +25,11 @@ export function CollapsibleSection({
 }) {
   const {colors, typography} = useTheme();
   const [open, setOpen] = useState(defaultOpen);
+  const rotation = useRef(new Animated.Value(defaultOpen ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(rotation, {toValue: open ? 1 : 0, duration: 200, useNativeDriver: true}).start();
+  }, [open, rotation]);
 
   return (
     <View style={styles.wrapper}>
@@ -47,7 +53,14 @@ export function CollapsibleSection({
             <Text style={[typography.small, styles.subtitle]}>{subtitle}</Text>
           ) : null}
         </View>
-        <Text style={[styles.chevron, {color: colors.textMuted}]}>{open ? '⌃' : '⌄'}</Text>
+        <Animated.View
+          style={{
+            transform: [
+              {rotate: rotation.interpolate({inputRange: [0, 1], outputRange: ['0deg', '180deg']})},
+            ],
+          }}>
+          <ChevronDownIcon size={18} color={colors.textMuted} />
+        </Animated.View>
       </TouchableOpacity>
       {open && <View style={styles.body}>{children}</View>}
     </View>
@@ -78,6 +91,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   subtitle: {marginTop: 2},
-  chevron: {fontSize: 18, fontWeight: '700', paddingHorizontal: spacing.xs},
   body: {marginTop: spacing.xs},
 });

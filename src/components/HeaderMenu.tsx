@@ -3,7 +3,7 @@ import {Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View} from 'react
 import {radius, spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
 import {DownloadedModel} from '../types';
-import {GearIcon, GridIcon, UploadIcon} from './Icons';
+import {GearIcon, GridIcon, UploadIcon, ChevronDownIcon} from './Icons';
 import {ModelPickerList} from './ModelPickerList';
 
 /**
@@ -79,9 +79,12 @@ export function HeaderMenu({
             <TouchableOpacity style={styles.item} onPress={() => setModelExpanded(v => !v)}>
               <GridIcon color={colors.textPrimary} />
               <Text style={[typography.body, styles.itemLabel]}>Model</Text>
-              <Text style={[styles.chevron, {color: colors.textMuted}]}>
-                {modelExpanded ? '⌄' : '›'}
-              </Text>
+              {/* ChevronDownIcon's natural orientation already points down
+                  (the "expanded" state) -- rotated -90deg to point right
+                  (collapsed), matching the old '›' vs '⌄' glyph swap. */}
+              <View style={{transform: [{rotate: modelExpanded ? '0deg' : '-90deg'}]}}>
+                <ChevronDownIcon size={16} color={colors.textMuted} />
+              </View>
             </TouchableOpacity>
             {modelExpanded && (
               <ScrollView style={styles.submenu} nestedScrollEnabled>
@@ -126,7 +129,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   itemLabel: {flex: 1},
-  chevron: {fontSize: 18},
   submenu: {
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,

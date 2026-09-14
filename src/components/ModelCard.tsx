@@ -28,7 +28,7 @@ import {QueueItemStatus} from '../services/downloadQueue';
  * ("Fast"/"Good quality" vs a plain weak model's "Very fast"/"Lightweight"),
  * matching how the reference distinguishes its recommended pick from a
  * merely-small one. */
-function tierSpecPair(tier: ModelTier | undefined, highlighted?: boolean): [string, string] | null {
+export function tierSpecPair(tier: ModelTier | undefined, highlighted?: boolean): [string, string] | null {
   if (tier === 'weak') {
     return highlighted ? ['Fast', 'Good quality'] : ['Very fast', 'Lightweight'];
   }
@@ -45,7 +45,7 @@ function tierSpecPair(tier: ModelTier | undefined, highlighted?: boolean): [stri
  * visually distinct at a glance (the same purpose the reference design's
  * varied icon colors serve) -- vendor identity still renders inside via
  * VendorLogo, this only colors the tile behind it. */
-function tierTileColors(
+export function tierTileColors(
   tier: ModelTier | undefined,
   colors: ReturnType<typeof useTheme>['colors'],
 ): {bg: string; fg: string} {
@@ -79,7 +79,7 @@ export type ModelRowInfo = {
   vendor?: ModelVendor;
 };
 
-function formatSize(bytes: number): string {
+export function formatSize(bytes: number): string {
   if (bytes <= 0) {
     // Unknown size (e.g. a pasted "Add Remote Model" URL, before the
     // download's Content-Length has been read).

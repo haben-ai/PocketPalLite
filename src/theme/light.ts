@@ -3,18 +3,21 @@
 // dark text, accent stays a plain black/white inversion (no brand color).
 export const lightColors = {
   background: '#FFFFFF',
-  sidebarBackground: '#F7F7F8',
+  sidebarBackground: '#F4F8FF',
 
-  surfaceContainerLow: '#F7F7F8',
-  surfaceContainer: '#F0F0F1',
-  surfaceContainerHigh: '#E8E8EA',
-  surfaceContainerHighest: '#DEDEE1',
-  surface: '#F0F0F1',
-  surfaceRaised: '#E8E8EA',
+  // Whitish-blue surface scale (explicitly requested) -- replaces the
+  // earlier neutral-gray card tones with a soft blue tint, still light
+  // enough to read as "off-white" rather than a colored panel.
+  surfaceContainerLow: '#F4F8FF',
+  surfaceContainer: '#EAF2FF',
+  surfaceContainerHigh: '#DCE9FC',
+  surfaceContainerHighest: '#CFE0FA',
+  surface: '#EAF2FF',
+  surfaceRaised: '#DCE9FC',
 
-  outline: '#D9D9DC',
-  outlineVariant: '#E5E5E7',
-  border: '#D9D9DC',
+  outline: '#C9DCF5',
+  outlineVariant: '#DCE9FC',
+  border: '#C9DCF5',
 
   // Pure black, not a near-black gray -- explicitly requested for light
   // mode's body text (the near-black #1A1A1A this used to be is why light

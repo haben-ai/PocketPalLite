@@ -2,6 +2,7 @@ import React, {useCallback, useEffect, useState} from 'react';
 import {Linking, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View} from 'react-native';
 import DeviceInfo from 'react-native-device-info';
 import {Alert} from '../components/AppDialog';
+import {ChevronDownIcon} from '../components/Icons';
 import {useTranslation} from 'react-i18next';
 import {radius, spacing} from '../theme';
 import {useTheme, useThemeContext} from '../theme/ThemeContext';
@@ -328,10 +329,10 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
           bare
           label={t('settings.advancedSettings')}
           control={
-            <TouchableOpacity onPress={() => setAdvancedExpanded(v => !v)}>
-              <Text style={[styles.chevron, {color: colors.textMuted}]}>
-                {advancedExpanded ? '⌄' : '›'}
-              </Text>
+            <TouchableOpacity onPress={() => setAdvancedExpanded(v => !v)} hitSlop={8}>
+              <View style={{transform: [{rotate: advancedExpanded ? '0deg' : '-90deg'}]}}>
+                <ChevronDownIcon size={18} color={colors.textMuted} />
+              </View>
             </TouchableOpacity>
           }
         />
@@ -501,7 +502,7 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
               <Text style={typography.body}>
                 {SUPPORTED_LANGUAGES.find(l => l.code === settings.language)?.label ?? settings.language}
               </Text>
-              <Text style={{color: colors.textMuted}}>⌄</Text>
+              <ChevronDownIcon size={16} color={colors.textMuted} />
             </TouchableOpacity>
           }
         />
@@ -774,7 +775,6 @@ const styles = StyleSheet.create({
   },
   contextPillDisabled: {opacity: 0.4},
   contextPillLabel: {fontSize: 12, fontWeight: '600'},
-  chevron: {fontSize: 20},
   sliderControl: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs},
   sliderTrackWrap: {flex: 1},
   valueBox: {

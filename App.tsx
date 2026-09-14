@@ -56,7 +56,12 @@ export default function App() {
       // the background, it just won't be able to show the notification
       // Android requires for a foreground service -- not fatal, just less
       // visible, so a denial here doesn't need any special handling.
-      if (Platform.OS === 'android' && Platform.Version >= 33) {
+      //
+      // Only requested here for a user who's already past onboarding --
+      // for a fresh install, OnboardingScreen.tsx asks at the very end of
+      // the flow instead (explicitly requested placement), so this doesn't
+      // also fire immediately at cold start and double-prompt.
+      if (seen && Platform.OS === 'android' && Platform.Version >= 33) {
         PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
         ).catch(() => undefined);

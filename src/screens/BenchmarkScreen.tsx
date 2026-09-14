@@ -22,7 +22,7 @@ import {AIPalScaffold} from '../components/AIPalScaffold';
 import {Card} from '../components/Card';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {ModelPickerList} from '../components/ModelPickerList';
-import {TrashIcon} from '../components/Icons';
+import {TrashIcon, ChevronDownIcon, SlidersIcon} from '../components/Icons';
 
 type Props = {onNavigate: (screen: AppScreen) => void};
 
@@ -294,9 +294,9 @@ export function BenchmarkScreen({onNavigate}: Props) {
             onPress={() => setDeviceCardOpen(v => !v)}
             activeOpacity={0.7}>
             <Text style={typography.heading}>Device Information</Text>
-            <Text style={[styles.chevron, {color: colors.textMuted}]}>
-              {deviceCardOpen ? '⌃' : '⌄'}
-            </Text>
+            <View style={{transform: [{rotate: deviceCardOpen ? '180deg' : '0deg'}]}}>
+              <ChevronDownIcon size={18} color={colors.textMuted} />
+            </View>
           </TouchableOpacity>
           {deviceCardOpen && (
             <>
@@ -320,13 +320,15 @@ export function BenchmarkScreen({onNavigate}: Props) {
         <Text style={typography.body} numberOfLines={1}>
           {selectedName ?? (downloaded.length === 0 ? 'No models downloaded' : 'Select a model')}
         </Text>
-        {downloaded.length > 0 && <Text style={{color: colors.textMuted}}>⌄</Text>}
+        {downloaded.length > 0 && <ChevronDownIcon size={18} color={colors.textMuted} />}
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.advancedRow} onPress={() => setAdvancedOpen(v => !v)}>
-        <Text style={[typography.body, {color: colors.accent}]}>
-          ⚙ Advanced Settings {advancedOpen ? '⌃' : '⌄'}
-        </Text>
+      <TouchableOpacity style={styles.advancedRowIcon} onPress={() => setAdvancedOpen(v => !v)}>
+        <SlidersIcon size={16} color={colors.accent} />
+        <Text style={[typography.body, {color: colors.accent}]}>Advanced Settings</Text>
+        <View style={{transform: [{rotate: advancedOpen ? '180deg' : '0deg'}]}}>
+          <ChevronDownIcon size={16} color={colors.accent} />
+        </View>
       </TouchableOpacity>
 
       {advancedOpen && (
@@ -517,7 +519,6 @@ export function BenchmarkScreen({onNavigate}: Props) {
 const styles = StyleSheet.create({
   deviceCard: {marginTop: spacing.md, marginBottom: spacing.md},
   deviceHeader: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
-  chevron: {fontSize: 18, fontWeight: '700'},
   deviceLine: {marginTop: 4},
   modelSelector: {
     flexDirection: 'row',
@@ -529,7 +530,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginBottom: spacing.sm,
   },
-  advancedRow: {alignItems: 'center', paddingVertical: spacing.sm},
+  advancedRowIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: spacing.sm,
+  },
   advancedCard: {marginBottom: spacing.sm, gap: spacing.sm},
   paramRow: {
     flexDirection: 'row',

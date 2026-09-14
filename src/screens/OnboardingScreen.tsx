@@ -1,61 +1,184 @@
-import React, {useRef, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  SafeAreaView,
+  Animated,
+  Easing,
+  Image,
+  ImageBackground,
+  PermissionsAndroid,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from 'react-native';
-import {ArrowRight, Check, ClipboardList, FileText, Languages, Lock, Sparkles} from 'lucide-react-native';
-import {useTheme} from '../theme/ThemeContext';
+import {ArrowRight, Check, Lock} from 'lucide-react-native';
+import Svg, {Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
 import {PrimaryButton} from '../components/PrimaryButton';
-import {AppIconMark} from '../components/AppIconMark';
-import {OnboardingScenery} from '../components/OnboardingScenery';
-import {LocalAiFlowDiagram, LanguageBubbles} from '../components/OnboardingDiagrams';
+import {OnboardingModelCard} from '../components/OnboardingModelCard';
+import {ModelRowInfo, formatSize} from '../components/ModelCard';
+import {lightColors} from '../theme/light';
 import {radius, spacing} from '../theme';
 import {KEYS, setJSON} from '../storage/asyncStore';
+import {MODEL_CATALOG, getModelById} from '../data/models';
+import {getStoredDeviceTier} from '../services/deviceAnalyzer';
+import {DeviceTier, ModelInfo} from '../types';
 
-const CHECKLIST = [
-  '100% offline after download',
-  'No data leaves your device',
-  'Your conversations are yours',
-];
+const scenery = require('../assets/images/onboarding-scenery.jpg');
+const logoTransparent = require('../assets/images/logo-transparent.png');
 
-const CONTENT_ICONS: {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- see
-  // OnboardingDiagrams.tsx's identical IconNode comment for why.
-  icon: React.ComponentType<any>;
-  label: string;
-}[] = [
-  {icon: FileText, label: 'Text'},
-  {icon: ClipboardList, label: 'Summarize'},
-  {icon: Languages, label: 'Translate'},
-  {icon: Sparkles, label: 'Create'},
-];
+const CHECKLIST = ['100% offline after download', 'No data leaves your device', 'Your conversations are yours'];
 
 const SLIDE_COUNT = 5;
+const STEP = {welcome: 0, choose: 1, download: 2, privacy: 3, done: 4} as const;
+
+// Fixed, illustrative progress for the download screen -- this step is a
+// static mockup of the UI/structure only (explicitly requested, and now
+// explicitly non-interactive too), not a real download; scaled against the
+// real selected model's real size so the numbers shown are at least
+// internally consistent, not just copied from a reference screenshot
+// verbatim regardless of which model is selected.
+const MOCK_PROGRESS_FRACTION = 0.68;
+const MOCK_ETA_LABEL = 'About 1 min left';
+
+// Onboarding always renders in this fixed light/whitish-blue palette (see
+// theme/light.ts), never the app's own resolved (possibly dark) theme --
+// explicitly requested: every onboarding screen must read as white with a
+// blue accent regardless of the device's system dark/light setting.
+const ONB = lightColors;
+
+// Deep navy -- explicitly specified for the welcome slide's brand/heading
+// text (reference spec: "~#10294A"), distinct from the pure-black
+// ONB.textPrimary used everywhere else in onboarding.
+const NAVY = '#10294A';
+const NAVY_MUTED = '#4A5D78';
+
+// Static Nunito Sans weight instances bundled at
+// android/app/src/main/assets/fonts/NunitoSans-*.ttf (generated from
+// Google's variable Nunito Sans font, per the explicit typography spec --
+// modern rounded geometric sans, distinct from the app's own default font,
+// used only within onboarding). No fontWeight is set alongside these --
+// each weight is already its own separate font file/family, so adding a
+// numeric fontWeight on top would make Android synthesize extra (faux)
+// bold rather than pick a different real face.
+const FONT = {
+  brand: 'NunitoSans-Bold',
+  heading: 'NunitoSans-ExtraBold',
+  body: 'NunitoSans-Regular',
+  medium: 'NunitoSans-Medium',
+  semiBold: 'NunitoSans-SemiBold',
+};
+
+// Reserves space at the bottom of every slide so its content never sits
+// underneath the floating progress-bar + footer overlay (see bottomOverlay
+// below, which renders on top of every slide -- including, on the welcome
+// slide, on top of the photo -- rather than pushing slides up in normal
+// layout flow).
+const FOOTER_RESERVE = 168;
+
+function catalogToRow(model: ModelInfo): ModelRowInfo {
+  return {
+    id: model.id,
+    name: model.name,
+    sizeBytes: model.sizeBytes + (model.mmprojSizeBytes ?? 0),
+    tier: model.tier,
+    capability: model.capability,
+    params: model.params,
+    quant: model.quant,
+    minRamGB: model.minRamGB,
+    vendor: model.vendor,
+  };
+}
+
+/** Plain, static app mark -- used at the top of the welcome slide. No
+ * animation (explicitly requested): a continuously spinning brand mark at
+ * the very top of the first screen a user ever sees read as distracting
+ * rather than polished, per that request. */
+function LogoMark({size = 72}: {size?: number}) {
+  return <Image source={logoTransparent} resizeMode="contain" style={{width: size, height: size}} />;
+}
+
+/** The animated version -- fade + scale entrance plus a slow continuous
+ * rotation -- kept for the closing "You're all set" slide only (not
+ * requested to change there). */
+function AnimatedLogo({size = 96}: {size?: number}) {
+  const enter = useRef(new Animated.Value(0)).current;
+  const spin = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const entrance = Animated.timing(enter, {toValue: 1, duration: 700, useNativeDriver: true});
+    const loop = Animated.loop(
+      Animated.timing(spin, {
+        toValue: 1,
+        duration: 22000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    entrance.start();
+    loop.start();
+    // Without this, the looping rotation keeps its timer alive past
+    // unmount -- harmless in the app itself (the whole screen unmounts
+    // together), but it's what left a timer running past test teardown in
+    // App.test.tsx (a "Jest environment torn down" warning) until this was
+    // added.
+    return () => {
+      entrance.stop();
+      loop.stop();
+    };
+  }, [enter, spin]);
+
+  return (
+    <Animated.Image
+      source={logoTransparent}
+      resizeMode="contain"
+      style={{
+        width: size,
+        height: size,
+        opacity: enter,
+        transform: [
+          {scale: enter.interpolate({inputRange: [0, 1], outputRange: [0.75, 1]})},
+          {rotate: spin.interpolate({inputRange: [0, 1], outputRange: ['0deg', '360deg']})},
+        ],
+      }}
+    />
+  );
+}
 
 export function OnboardingScreen({onDone}: {onDone: () => void}) {
-  const {colors, typography} = useTheme();
-  const {width} = useWindowDimensions();
-  const scrollRef = useRef<ScrollView>(null);
   const [step, setStep] = useState(0);
 
-  const goToStep = (next: number) => {
-    setStep(next);
-    scrollRef.current?.scrollTo({x: next * width, animated: true});
-  };
+  const [device, setDevice] = useState<DeviceTier | null>(null);
+  const [selectedModelId, setSelectedModelId] = useState<string | undefined>();
 
-  const handleMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = Math.round(e.nativeEvent.contentOffset.x / width);
-    if (index !== step) {
-      setStep(index);
+  const goToStep = (next: number) => setStep(next);
+
+  // Real device recommendation (App.tsx computes this once, ever, right
+  // after onboarding starts -- see deviceAnalyzer.ts), not mock content --
+  // pre-selects a sensible model and flags it as "Recommended" the same way
+  // the real Models tab does. The Choose-model slide itself is a static
+  // display of this real result, not an interactive picker.
+  useEffect(() => {
+    (async () => {
+      const tier = await getStoredDeviceTier();
+      setDevice(tier);
+      setSelectedModelId(tier?.recommendedModelId ?? MODEL_CATALOG[0]?.id);
+    })();
+  }, []);
+
+  // Requested placement: the notification permission prompt appears when
+  // onboarding's own last screen is reached, not at cold start -- App.tsx's
+  // own request is gated off for a first-run user for exactly this reason
+  // (see its comment), so this is the only place it fires for them.
+  useEffect(() => {
+    if (step === STEP.done && Platform.OS === 'android' && Platform.Version >= 33) {
+      PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS).catch(() => undefined);
     }
-  };
+  }, [step]);
+
+  const selectedModel = selectedModelId ? getModelById(selectedModelId) : undefined;
+  const storageNeededBytes = selectedModel ? selectedModel.sizeBytes + (selectedModel.mmprojSizeBytes ?? 0) : 0;
+  const mockDownloadedBytes = Math.round(storageNeededBytes * MOCK_PROGRESS_FRACTION);
 
   const finishToSettings = async () => {
     // Rides the same "resume where you left off" mechanism ChatScreen's
@@ -67,179 +190,360 @@ export function OnboardingScreen({onDone}: {onDone: () => void}) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
-      <ScrollView
-        ref={scrollRef}
-        style={styles.scroll}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={handleMomentumEnd}>
-        {/* Slide 1: Welcome */}
-        <View style={[styles.page, styles.heroPage, {width}]}>
-          <OnboardingScenery accent={colors.accent} />
-          <View style={styles.heroBlock}>
-            <AppIconMark size={72} />
-            <Text style={styles.heroTitle}>Zayla</Text>
-            <Text style={styles.heroTagline}>AI that stays with you.</Text>
-            <Text style={styles.heroSubtitle}>Powerful AI. Private, offline, and on your device.</Text>
+    <View style={[styles.container, {backgroundColor: ONB.background}]}>
+      {/* Only the active step is ever mounted -- there's no free-swipe
+          gesture (navigation is entirely button-driven), and an animated
+          horizontal ScrollView with scrollEnabled=false never reliably
+          reaches native "idle" here (its scrollTo animation has no touch
+          gesture to settle against), which left a sliver of the previous
+          slide visibly stuck on-screen. A plain conditional render has no
+          such settling step, so it can't get stuck. */}
+      {step === STEP.welcome && (
+        // Slide 1: Welcome -- the one photo-background screen, filled
+        // edge-to-edge (no gap below it: the progress bar/footer float on
+        // top of it via bottomOverlay below, instead of sitting in a
+        // separate strip beneath it). Logo is static and pinned to the
+        // top; the brand block stays anchored to the bottom.
+        <ImageBackground source={scenery} resizeMode="cover" style={[styles.page, styles.heroPage]}>
+          {/* Subtle white/blue legibility gradient over the upper portion
+              only, fading to fully transparent above the mountains -- the
+              photo's own sky is already bright, this just guarantees
+              contrast for the dark navy text on any device/photo variance,
+              per the reference's "subtle white/blue translucent gradient
+              overlay". Built with react-native-svg (already a dependency)
+              rather than adding a gradient package. */}
+          <Svg style={styles.heroGradient} width="100%" height="58%">
+            <Defs>
+              <LinearGradient id="heroFade" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor="#EAF4FF" stopOpacity={0.55} />
+                <Stop offset="0.7" stopColor="#EAF4FF" stopOpacity={0.18} />
+                <Stop offset="1" stopColor="#EAF4FF" stopOpacity={0} />
+              </LinearGradient>
+            </Defs>
+            <Rect x="0" y="0" width="100%" height="100%" fill="url(#heroFade)" />
+          </Svg>
+          <View style={styles.heroTop}>
+            <LogoMark size={132} />
+            <Text style={styles.heroBrand}>Zayla</Text>
+            <Text style={styles.heroHeading}>AI that stays{'\n'}with you.</Text>
+            <Text style={styles.heroSubtitle}>Powerful AI. Private, offline,{'\n'}and on your device.</Text>
           </View>
-        </View>
+        </ImageBackground>
+      )}
 
-        {/* Slide 2: No internet required */}
-        <View style={[styles.page, styles.pageLight, {width, backgroundColor: colors.background}]}>
-          <Text style={[typography.title, styles.title]}>No internet required</Text>
-          <Text style={[typography.body, styles.body, {color: colors.textSecondary}]}>
-            Once your model is downloaded, your conversations can run entirely on your device.
+      {step === STEP.choose && (
+        // Slide 2: Choose the right model -- real catalog, real device
+        // recommendation. A static display of the real recommendation, not
+        // an interactive picker (explicitly requested).
+        <View style={[styles.page, styles.pageLight]}>
+          <Text style={styles.title}>Choose the right model</Text>
+          <Text style={styles.body}>
+            We recommend models based on your device's RAM and storage. You can change this anytime.
           </Text>
-          <View style={styles.diagramSlot}>
-            <LocalAiFlowDiagram />
-          </View>
+          <ScrollView
+            style={styles.modelList}
+            contentContainerStyle={styles.modelListContent}
+            showsVerticalScrollIndicator={false}>
+            {MODEL_CATALOG.map(model => (
+              <OnboardingModelCard
+                key={model.id}
+                model={catalogToRow(model)}
+                selected={selectedModelId === model.id}
+                recommended={device?.recommendedModelId === model.id}
+              />
+            ))}
+          </ScrollView>
         </View>
+      )}
 
-        {/* Slide 3: Multilingual & versatile */}
-        <View style={[styles.page, styles.pageLight, {width, backgroundColor: colors.background}]}>
-          <Text style={[typography.title, styles.title]}>Multilingual & versatile</Text>
-          <Text style={[typography.body, styles.body, {color: colors.textSecondary}]}>
-            Chat in the language you prefer. Your AI understands and responds in multiple languages.
-          </Text>
-          <View style={styles.diagramSlot}>
-            <LanguageBubbles />
-            <View style={styles.iconRow}>
-              {CONTENT_ICONS.map(({icon: Icon, label}) => (
-                <View key={label} style={styles.iconRowItem}>
-                  <Icon size={20} color={colors.textSecondary} />
-                  <Text style={[typography.small, {color: colors.textMuted}]}>{label}</Text>
+      {step === STEP.download && (
+        // Slide 3: Download model -- a static mockup of the UI/structure
+        // only (explicitly requested): no downloadQueue call happens on
+        // this screen, and its Pause/Cancel controls are plain, non-
+        // interactive visuals rather than real buttons.
+        <View style={[styles.page, styles.pageLight]}>
+          <Text style={styles.title}>Download model</Text>
+          <Text style={styles.body}>Get the model and start chatting in just a few minutes.</Text>
+          {selectedModel && (
+            <View style={[styles.downloadCard, {backgroundColor: ONB.surfaceContainer, borderColor: ONB.outlineVariant}]}>
+              <Text style={styles.cardHeading}>{selectedModel.name}</Text>
+              <View style={styles.downloadFactsRow}>
+                <Text style={[styles.caption, {color: ONB.textSecondary}]}>Model size</Text>
+                <Text style={styles.caption}>{formatSize(selectedModel.sizeBytes)}</Text>
+              </View>
+              <View style={styles.downloadFactsRow}>
+                <Text style={[styles.caption, {color: ONB.textSecondary}]}>Storage needed</Text>
+                <Text style={styles.caption}>
+                  {formatSize(storageNeededBytes)}
+                  {selectedModel.mmprojSizeBytes ? ' (incl. vision files)' : ''}
+                </Text>
+              </View>
+
+              <View style={styles.downloadProgressSlot}>
+                <Text style={styles.progressTitle}>Downloading... {Math.round(MOCK_PROGRESS_FRACTION * 100)}%</Text>
+                <View style={[styles.progressTrack, {backgroundColor: ONB.surfaceContainerHigh}]}>
+                  <View
+                    style={[
+                      styles.progressFillBar,
+                      {width: `${MOCK_PROGRESS_FRACTION * 100}%`, backgroundColor: ONB.accent},
+                    ]}
+                  />
                 </View>
-              ))}
-            </View>
-          </View>
-        </View>
+                <Text style={[styles.small, {color: ONB.textMuted}]}>
+                  {formatSize(mockDownloadedBytes)} / {formatSize(storageNeededBytes)} · {MOCK_ETA_LABEL}
+                </Text>
+              </View>
 
-        {/* Slide 4: Your privacy matters */}
-        <View style={[styles.page, styles.pageLight, {width, backgroundColor: colors.background}]}>
-          <Text style={[typography.title, styles.title]}>Your privacy matters</Text>
-          <Text style={[typography.body, styles.body, {color: colors.textSecondary}]}>
-            Your conversations stay on your device. No data is sent to the cloud.
-          </Text>
+              <View style={[styles.tipCard, {backgroundColor: ONB.accentMuted}]}>
+                <Text style={[styles.tipLine, {color: ONB.accent}]}>Keep the app open during download</Text>
+                <Text style={[styles.tipLine, {color: ONB.accent}]}>Use Wi-Fi for a faster experience</Text>
+              </View>
+
+              {/* Static mockup only -- not wrapped in any touchable. */}
+              <View style={[styles.mockPauseButton, {backgroundColor: ONB.accent}]}>
+                <Text style={styles.mockPauseLabel}>Pause</Text>
+              </View>
+              <Text style={styles.mockCancelLink}>Cancel</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {step === STEP.privacy && (
+        // Slide 4: Your privacy matters
+        <View style={[styles.page, styles.pageLight]}>
+          <Text style={styles.title}>Your privacy matters</Text>
+          <Text style={styles.body}>Your conversations stay on your device. No data is sent to the cloud.</Text>
           <View style={styles.diagramSlot}>
-            <View style={[styles.shieldCircle, {backgroundColor: colors.accentMuted}]}>
-              <Lock size={36} color={colors.accent} />
+            <View style={[styles.shieldCircle, {backgroundColor: ONB.accentMuted}]}>
+              <Lock size={36} color={ONB.accent} />
             </View>
             <View style={styles.checklist}>
               {CHECKLIST.map(item => (
                 <View key={item} style={styles.checklistRow}>
-                  <Check size={16} color={colors.success} />
-                  <Text style={[typography.body, {color: colors.textPrimary}]}>{item}</Text>
+                  <Check size={16} color={ONB.success} />
+                  <Text style={[styles.body, styles.checklistText, {color: ONB.textPrimary}]}>{item}</Text>
                 </View>
               ))}
             </View>
           </View>
         </View>
+      )}
 
-        {/* Slide 5: You're all set */}
-        <View style={[styles.page, styles.heroPage, {width}]}>
-          <OnboardingScenery accent={colors.accent} />
-          <View style={styles.heroBlock}>
-            <AppIconMark size={72} />
-            <Text style={styles.heroTitle}>You're all set!</Text>
-            <Text style={styles.heroSubtitle}>
-              Start your first conversation and experience the power of AI on your device.
+      {step === STEP.done && (
+        // Slide 5: You're all set -- same photo background as the welcome
+        // slide (explicitly requested), not the plain light surface every
+        // other slide uses. Text stays dark (doneTitle/doneSubtitle were
+        // already ONB.textPrimary/textSecondary), matching the welcome
+        // slide's dark-on-photo treatment. Logo animation is unchanged.
+        <ImageBackground source={scenery} resizeMode="cover" style={[styles.page, styles.donePage]}>
+          <AnimatedLogo size={88} />
+          <Text style={styles.doneTitle}>You're all set!</Text>
+          <Text style={styles.doneSubtitle}>
+            Start your first conversation and experience the power of AI on your device.
+          </Text>
+        </ImageBackground>
+      )}
+
+      {/* Floats on top of every slide -- including the welcome photo --
+          instead of sitting in its own opaque strip beneath the ScrollView,
+          so the photo (and every other slide's background) genuinely fills
+          the full screen behind it. */}
+      {step === STEP.welcome ? (
+        // Welcome-only bottom layout, per the explicit reference spec:
+        // button, then link, then a compact "N / total" counter with a
+        // short centered bar right at the bottom edge -- a different order
+        // and shape from every other slide's shared full-width bar above
+        // the footer, so it's a separate block rather than a variant of
+        // bottomOverlay/footer below.
+        <View style={styles.welcomeBottom} pointerEvents="box-none">
+          <PrimaryButton
+            label="Get Started  →"
+            onPress={() => goToStep(STEP.choose)}
+            style={styles.welcomeButton}
+            labelStyle={styles.buttonLabel}
+          />
+          <TouchableOpacity onPress={onDone} hitSlop={10} style={styles.welcomeLinkWrap}>
+            <Text style={styles.welcomeLink}>I already have a model</Text>
+          </TouchableOpacity>
+          <View style={styles.welcomeProgressWrap}>
+            <Text style={styles.welcomeProgressLabel}>
+              {step + 1} / {SLIDE_COUNT}
             </Text>
+            <View style={styles.welcomeProgressTrack}>
+              <View style={[styles.welcomeProgressFill, {width: `${((step + 1) / SLIDE_COUNT) * 100}%`}]} />
+            </View>
           </View>
         </View>
-      </ScrollView>
-
-      <View style={styles.progressTrack}>
-        <View
-          style={[
-            styles.progressFill,
-            {width: `${((step + 1) / SLIDE_COUNT) * 100}%`, backgroundColor: colors.accent},
-          ]}
-        />
-      </View>
-
-      <View style={styles.footer}>
-        {step === 0 ? (
-          <>
-            <PrimaryButton label="Get Started  →" onPress={() => goToStep(1)} />
-            <TouchableOpacity onPress={onDone} hitSlop={10} style={styles.centerLink}>
-              <Text style={[typography.body, {color: colors.textMuted}]}>I already have a model</Text>
-            </TouchableOpacity>
-          </>
-        ) : step === SLIDE_COUNT - 1 ? (
-          <>
-            <PrimaryButton label="Start Chatting  →" onPress={onDone} />
-            <TouchableOpacity onPress={finishToSettings} hitSlop={10} style={styles.centerLink}>
-              <Text style={[typography.body, {color: colors.accent}]}>Explore Settings</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <View style={styles.linksRow}>
-            <TouchableOpacity onPress={onDone} hitSlop={10}>
-              <Text style={[typography.body, {color: colors.textMuted}]}>Skip</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => goToStep(step + 1)}
-              hitSlop={10}
-              style={[styles.arrowButton, {backgroundColor: colors.accent}]}>
-              <ArrowRight size={20} color={colors.onAccent} />
-            </TouchableOpacity>
+      ) : (
+        <View style={styles.bottomOverlay} pointerEvents="box-none">
+          <View style={styles.progressTrack2}>
+            <View
+              style={[styles.progressFill, {width: `${((step + 1) / SLIDE_COUNT) * 100}%`, backgroundColor: ONB.accent}]}
+            />
           </View>
-        )}
-      </View>
-    </SafeAreaView>
+
+          <View style={styles.footer}>
+            {step === STEP.done ? (
+              <>
+                <PrimaryButton label="Start Chatting  →" onPress={onDone} labelStyle={styles.buttonLabel} />
+                <TouchableOpacity onPress={finishToSettings} hitSlop={10} style={styles.centerLink}>
+                  <Text style={[styles.linkLabel, {color: ONB.accent}]}>Explore Settings</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={styles.linksRow}>
+                <TouchableOpacity onPress={onDone} hitSlop={10}>
+                  <Text style={[styles.linkLabel, {color: ONB.textMuted}]}>Skip</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => goToStep(step + 1)}
+                  hitSlop={10}
+                  style={[styles.arrowButton, {backgroundColor: ONB.accent}]}>
+                  <ArrowRight size={20} color={ONB.onAccent} />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {flex: 1},
-  scroll: {flex: 1},
-  page: {alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32},
-  // Explicit height (a horizontal ScrollView's pages don't otherwise
-  // stretch to fill it -- they shrink-wrap their content) so
-  // OnboardingScenery's absolute-fill background actually reaches the
-  // bottom of the slide instead of cutting off wherever the centered
-  // content block happens to end.
-  heroPage: {height: '100%', justifyContent: 'flex-end', paddingBottom: 48},
-  pageLight: {paddingTop: 60},
-  heroBlock: {alignItems: 'center', paddingHorizontal: 32},
-  heroTitle: {
-    color: '#FFFFFF',
-    fontSize: 34,
-    fontWeight: '800',
+  page: {flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32},
+  // Top-anchored now (matches the reference layout): logo + brand + heading
+  // + subtitle cluster together just below the status bar, leaving the
+  // photo's scenic lower half open behind the Get Started button/link that
+  // bottomOverlay floats on top of. No scrim -- the reference shows dark
+  // text sitting directly on the photo's own light sky, not white text on
+  // a darkened photo.
+  heroPage: {justifyContent: 'flex-start', paddingTop: 64, paddingBottom: FOOTER_RESERVE},
+  heroTop: {alignItems: 'center', paddingHorizontal: 32},
+  heroGradient: {position: 'absolute', top: 0, left: 0, right: 0},
+  pageLight: {paddingTop: 60, paddingBottom: FOOTER_RESERVE, justifyContent: 'flex-start', alignItems: 'stretch'},
+  donePage: {justifyContent: 'center', alignItems: 'center', paddingTop: 0},
+  heroBrand: {
+    fontFamily: FONT.brand,
+    color: NAVY,
+    fontSize: 38,
     textAlign: 'center',
-    marginTop: spacing.md,
+    marginTop: 14,
   },
-  heroTagline: {
-    color: 'rgba(255,255,255,0.92)',
-    fontSize: 17,
-    fontWeight: '600',
+  heroHeading: {
+    fontFamily: FONT.heading,
+    color: NAVY,
+    fontSize: 43,
+    lineHeight: 45,
     textAlign: 'center',
-    marginTop: spacing.xs,
+    marginTop: 34,
   },
   heroSubtitle: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 14,
+    fontFamily: FONT.medium,
+    color: NAVY_MUTED,
+    fontSize: 18,
+    textAlign: 'center',
+    marginTop: 20,
+    lineHeight: 25,
+  },
+  doneTitle: {
+    fontFamily: FONT.heading,
+    color: ONB.textPrimary,
+    fontSize: 24,
+    textAlign: 'center',
+    marginTop: spacing.lg,
+  },
+  doneSubtitle: {
+    fontFamily: FONT.body,
+    color: ONB.textSecondary,
+    fontSize: 15,
     textAlign: 'center',
     marginTop: spacing.sm,
-    lineHeight: 20,
+    lineHeight: 21,
+    paddingHorizontal: spacing.lg,
   },
-  title: {textAlign: 'center', marginBottom: 12},
-  body: {textAlign: 'center', lineHeight: 22, marginBottom: spacing.xl},
+  title: {
+    fontFamily: FONT.heading,
+    color: ONB.textPrimary,
+    fontSize: 24,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  body: {
+    fontFamily: FONT.body,
+    color: ONB.textSecondary,
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: spacing.lg,
+  },
+  checklistText: {textAlign: 'left', marginBottom: 0},
+  cardHeading: {fontFamily: FONT.semiBold, color: ONB.textPrimary, fontSize: 17},
+  caption: {fontFamily: FONT.medium, color: ONB.textPrimary, fontSize: 13},
+  small: {fontFamily: FONT.medium, fontSize: 11},
+  modelList: {flex: 1},
+  modelListContent: {paddingBottom: spacing.lg},
+  downloadCard: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  downloadFactsRow: {flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2},
+  downloadProgressSlot: {marginTop: spacing.md, marginBottom: spacing.sm, gap: 6},
+  progressTitle: {fontFamily: FONT.semiBold, color: ONB.textPrimary, fontSize: 15},
+  progressTrack: {height: 6, borderRadius: radius.pill, overflow: 'hidden'},
+  progressFillBar: {height: '100%', borderRadius: radius.pill},
+  tipCard: {borderRadius: radius.md, padding: spacing.sm, gap: 4},
+  tipLine: {fontFamily: FONT.semiBold, fontSize: 11},
+  mockPauseButton: {
+    marginTop: spacing.sm,
+    paddingVertical: 12,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mockPauseLabel: {fontFamily: FONT.semiBold, color: ONB.onAccent, fontSize: 15},
+  mockCancelLink: {
+    fontFamily: FONT.medium,
+    color: ONB.textMuted,
+    fontSize: 15,
+    textAlign: 'center',
+    paddingTop: spacing.sm,
+  },
   diagramSlot: {width: '100%', alignItems: 'center', gap: spacing.lg},
-  iconRow: {flexDirection: 'row', justifyContent: 'space-around', width: '100%', marginTop: spacing.sm},
-  iconRowItem: {alignItems: 'center', gap: 6},
   shieldCircle: {
     width: 88,
     height: 88,
     borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    alignSelf: 'center',
   },
   checklist: {gap: spacing.sm, alignSelf: 'stretch', paddingHorizontal: spacing.lg},
   checklistRow: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm},
-  progressTrack: {
+  bottomOverlay: {position: 'absolute', left: 0, right: 0, bottom: 0},
+  // Welcome-only bottom layout (see JSX comment): button, link, then a
+  // compact centered "N / total" counter + short bar right at the bottom
+  // edge -- a different shape/order from the shared bottomOverlay/footer
+  // every other slide uses, per the reference spec.
+  welcomeBottom: {position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 28, paddingBottom: 16},
+  welcomeButton: {borderRadius: radius.pill, paddingVertical: 15},
+  welcomeLinkWrap: {alignItems: 'center', paddingTop: 22},
+  welcomeLink: {fontFamily: FONT.semiBold, color: ONB.accent, fontSize: 15},
+  welcomeProgressWrap: {alignItems: 'center', marginTop: 22},
+  welcomeProgressLabel: {fontFamily: FONT.medium, color: NAVY_MUTED, fontSize: 12, marginBottom: 6},
+  welcomeProgressTrack: {
+    width: 90,
+    height: 4,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(16,41,74,0.15)',
+    overflow: 'hidden',
+  },
+  welcomeProgressFill: {height: '100%', borderRadius: radius.pill, backgroundColor: ONB.accent},
+  progressTrack2: {
     height: 3,
     marginHorizontal: 32,
     borderRadius: radius.pill,
@@ -248,6 +552,8 @@ const styles = StyleSheet.create({
   },
   progressFill: {height: '100%', borderRadius: radius.pill},
   footer: {paddingHorizontal: 24, paddingTop: spacing.md, paddingBottom: 24, gap: spacing.sm},
+  buttonLabel: {fontFamily: FONT.semiBold},
+  linkLabel: {fontFamily: FONT.medium, fontSize: 15},
   centerLink: {alignItems: 'center', paddingTop: spacing.xs},
   linksRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
   arrowButton: {
