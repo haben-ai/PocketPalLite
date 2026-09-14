@@ -273,7 +273,7 @@ export function ModelCard({
           )}
           <View style={styles.detailsRow}>
             {compatibility && <ModelCompatibilityBadge compatibility={compatibility} />}
-            {performance !== undefined && <Chip label={`⚡ ~${performance} tok/s`} />}
+            {performance !== undefined && <Chip label={`~${performance} tok/s`} />}
             {model.capability && <CapabilityBadge capability={model.capability} compact />}
             {model.params && <Chip label={model.params} />}
             {model.quant && <Chip label={model.quant} />}
