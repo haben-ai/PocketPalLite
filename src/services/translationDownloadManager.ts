@@ -3,17 +3,23 @@ import {TranslationModelInfo} from '../types';
 import {downloadToFile, getFreeStorageBytes, DownloadCancelledError} from './downloadManager';
 import {registerDownloadedTranslationModel} from '../storage/translationModelRegistry';
 
-const TRANSLATION_MODELS_DIR = `${RNFS.DocumentDirectoryPath}/translation-models`;
+// A function, not a module-scope constant -- see downloadManager.ts's
+// modelsDir() for why reading RNFS.DocumentDirectoryPath at import time is
+// unsafe.
+function translationModelsDir(): string {
+  return `${RNFS.DocumentDirectoryPath}/translation-models`;
+}
 
 async function ensureDir(): Promise<void> {
-  const exists = await RNFS.exists(TRANSLATION_MODELS_DIR);
+  const dir = translationModelsDir();
+  const exists = await RNFS.exists(dir);
   if (!exists) {
-    await RNFS.mkdir(TRANSLATION_MODELS_DIR);
+    await RNFS.mkdir(dir);
   }
 }
 
 function filePathFor(modelId: string, fileName: string): string {
-  return `${TRANSLATION_MODELS_DIR}/${modelId}-${fileName}`;
+  return `${translationModelsDir()}/${modelId}-${fileName}`;
 }
 
 export type TranslationDownloadHandle = {

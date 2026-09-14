@@ -2,21 +2,29 @@ import RNFS from 'react-native-fs';
 import {ModelInfo} from '../types';
 import {registerDownloadedModel} from '../storage/modelRegistry';
 
-const MODELS_DIR = `${RNFS.DocumentDirectoryPath}/models`;
+// A function, not a module-scope constant -- RNFS.DocumentDirectoryPath is a
+// native-module property, and reading it at module-evaluation time means a
+// broken/unlinked RNFS on some platform throws during the app's very first
+// `require()` pass (before anything can render or catch it) instead of
+// inside an awaitable, catchable async call.
+function modelsDir(): string {
+  return `${RNFS.DocumentDirectoryPath}/models`;
+}
 
 export async function ensureModelsDir(): Promise<void> {
-  const exists = await RNFS.exists(MODELS_DIR);
+  const dir = modelsDir();
+  const exists = await RNFS.exists(dir);
   if (!exists) {
-    await RNFS.mkdir(MODELS_DIR);
+    await RNFS.mkdir(dir);
   }
 }
 
 export function modelFilePath(model: ModelInfo): string {
-  return `${MODELS_DIR}/${model.fileName}`;
+  return `${modelsDir()}/${model.fileName}`;
 }
 
 export function mmprojFilePath(model: ModelInfo): string | undefined {
-  return model.mmprojFileName ? `${MODELS_DIR}/${model.mmprojFileName}` : undefined;
+  return model.mmprojFileName ? `${modelsDir()}/${model.mmprojFileName}` : undefined;
 }
 
 export async function getFreeStorageBytes(): Promise<number> {
@@ -346,7 +354,7 @@ export async function downloadRemoteModel(
 ): Promise<DownloadHandle> {
   await ensureModelsDir();
 
-  const toFile = `${MODELS_DIR}/${modelId}-${sanitizeFileName(displayName)}.gguf`;
+  const toFile = `${modelsDir()}/${modelId}-${sanitizeFileName(displayName)}.gguf`;
 
   const handle = downloadToFile(url, toFile, onProgress, headers);
 
@@ -372,7 +380,7 @@ export async function importLocalModel(
 ): Promise<{filePath: string; sizeBytes: number}> {
   await ensureModelsDir();
   const safeName = fileName.endsWith('.gguf') ? fileName : `${fileName}.gguf`;
-  const targetPath = `${MODELS_DIR}/imported-${Date.now()}-${safeName}`;
+  const targetPath = `${modelsDir()}/imported-${Date.now()}-${safeName}`;
   await RNFS.copyFile(sourceUri, targetPath);
   const stat = await RNFS.stat(targetPath);
   return {filePath: targetPath, sizeBytes: Number(stat.size)};
