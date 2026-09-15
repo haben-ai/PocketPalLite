@@ -16,6 +16,6 @@ module.exports = {
   // default transformIgnorePatterns would otherwise skip them as "just
   // another node_modules package".
   transformIgnorePatterns: [
-    'node_modules/(?!(react-native|@react-native|react-native-gesture-handler|react-native-screens|react-native-safe-area-context|react-native-fs|react-native-tts|lucide-react-native|@react-navigation)/)',
+    'node_modules/(?!(react-native|@react-native|react-native-gesture-handler|react-native-screens|react-native-safe-area-context|react-native-fs|react-native-tts|react-native-haptic-feedback|lucide-react-native|@react-navigation)/)',
   ],
 };

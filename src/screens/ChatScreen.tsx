@@ -8,9 +8,9 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  Vibration,
   View,
 } from 'react-native';
+import {trigger as triggerHaptic} from 'react-native-haptic-feedback';
 import {pick, isErrorWithCode, errorCodes} from '@react-native-documents/picker';
 // Imported from the package's explicit index.js rather than the bare
 // package name: @dariyd/react-native-pdf-page-image's package.json has a
@@ -470,10 +470,16 @@ export function ChatScreen({
       if (settings.ttsEnabled) {
         speak(assistantMessage.content);
       }
-      // A short, single-pulse tap -- ChatGPT's own completion haptic is
-      // similarly light, not a long buzz. Fires regardless of foreground/
-      // background state, same as ChatGPT's in-app haptic.
-      Vibration.vibrate(40);
+      // A short, light tap via the real Taptic Engine API -- RN's core
+      // Vibration.vibrate() ignores its duration argument entirely on iOS
+      // (it always fires the same strong system "buzz" via
+      // AudioServicesPlaySystemSound, regardless of what ms value is
+      // passed), which is why this used to feel jarring on iPhone. This
+      // library calls UIImpactFeedbackGenerator directly, so "impactLight"
+      // is genuinely light there; Android gets an equivalently soft
+      // VibrationEffect. Fires regardless of foreground/background state,
+      // same as ChatGPT's in-app haptic.
+      triggerHaptic('impactLight');
       notifyIfBackgrounded(userMessage.content);
     } catch (err: any) {
       setStreamingText(null);

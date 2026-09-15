@@ -1,21 +1,23 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
-  Animated,
-  Easing,
   Image,
   ImageBackground,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   PermissionsAndroid,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import {ArrowRight, Check, Lock} from 'lucide-react-native';
+import {ArrowRight, EyeOff, Lock, WifiOff} from 'lucide-react-native';
 import Svg, {Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {OnboardingModelCard} from '../components/OnboardingModelCard';
+import {HuggingFaceIcon} from '../components/HuggingFaceIcon';
 import {ModelRowInfo, formatSize} from '../components/ModelCard';
 import {lightColors} from '../theme/light';
 import {radius, spacing} from '../theme';
@@ -27,7 +29,33 @@ import {DeviceTier, ModelInfo} from '../types';
 const scenery = require('../assets/images/onboarding-scenery.jpg');
 const logoTransparent = require('../assets/images/logo-transparent.png');
 
-const CHECKLIST = ['100% offline after download', 'No data leaves your device', 'Your conversations are yours'];
+// Three distinct icon/color pairings per feature (rather than one shield +
+// a plain checklist) -- a common pattern in polished onboarding flows,
+// where each privacy fact gets its own visual identity instead of reading
+// as one undifferentiated list.
+const PRIVACY_FEATURES = [
+  {
+    Icon: WifiOff,
+    tint: '#0081FB1F',
+    color: '#0081FB',
+    title: '100% Offline',
+    description: 'Works fully without an internet connection once your model is downloaded.',
+  },
+  {
+    Icon: Lock,
+    tint: '#1FA9711F',
+    color: '#1FA971',
+    title: 'On-Device Only',
+    description: 'Conversations are processed and stored only on your phone -- never uploaded.',
+  },
+  {
+    Icon: EyeOff,
+    tint: '#7C5CFC1F',
+    color: '#7C5CFC',
+    title: 'No Tracking',
+    description: 'No analytics, no accounts, nothing sent to any server, ever.',
+  },
+];
 
 const SLIDE_COUNT = 5;
 const STEP = {welcome: 0, choose: 1, download: 2, privacy: 3, done: 4} as const;
@@ -98,60 +126,29 @@ function LogoMark({size = 72}: {size?: number}) {
   return <Image source={logoTransparent} resizeMode="contain" style={{width: size, height: size}} />;
 }
 
-/** The animated version -- fade + scale entrance plus a slow continuous
- * rotation -- kept for the closing "You're all set" slide only (not
- * requested to change there). */
-function AnimatedLogo({size = 96}: {size?: number}) {
-  const enter = useRef(new Animated.Value(0)).current;
-  const spin = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const entrance = Animated.timing(enter, {toValue: 1, duration: 700, useNativeDriver: true});
-    const loop = Animated.loop(
-      Animated.timing(spin, {
-        toValue: 1,
-        duration: 22000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    );
-    entrance.start();
-    loop.start();
-    // Without this, the looping rotation keeps its timer alive past
-    // unmount -- harmless in the app itself (the whole screen unmounts
-    // together), but it's what left a timer running past test teardown in
-    // App.test.tsx (a "Jest environment torn down" warning) until this was
-    // added.
-    return () => {
-      entrance.stop();
-      loop.stop();
-    };
-  }, [enter, spin]);
-
-  return (
-    <Animated.Image
-      source={logoTransparent}
-      resizeMode="contain"
-      style={{
-        width: size,
-        height: size,
-        opacity: enter,
-        transform: [
-          {scale: enter.interpolate({inputRange: [0, 1], outputRange: [0.75, 1]})},
-          {rotate: spin.interpolate({inputRange: [0, 1], outputRange: ['0deg', '360deg']})},
-        ],
-      }}
-    />
-  );
-}
-
 export function OnboardingScreen({onDone}: {onDone: () => void}) {
+  const {width, height} = useWindowDimensions();
+  const scrollRef = useRef<ScrollView>(null);
   const [step, setStep] = useState(0);
 
   const [device, setDevice] = useState<DeviceTier | null>(null);
   const [selectedModelId, setSelectedModelId] = useState<string | undefined>();
 
-  const goToStep = (next: number) => setStep(next);
+  const goToStep = (next: number) => {
+    setStep(next);
+    scrollRef.current?.scrollTo({x: next * width, animated: true});
+  };
+
+  // Real swipe navigation (the ScrollView below has no scrollEnabled prop,
+  // so it defaults to true) -- this just keeps `step` (which drives the
+  // footer/progress UI) in sync with wherever the user's own drag actually
+  // lands, same as goToStep does for button taps.
+  const handleMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const index = Math.round(e.nativeEvent.contentOffset.x / width);
+    if (index !== step) {
+      setStep(index);
+    }
+  };
 
   // Real device recommendation (App.tsx computes this once, ever, right
   // after onboarding starts -- see deviceAnalyzer.ts), not mock content --
@@ -191,20 +188,19 @@ export function OnboardingScreen({onDone}: {onDone: () => void}) {
 
   return (
     <View style={[styles.container, {backgroundColor: ONB.background}]}>
-      {/* Only the active step is ever mounted -- there's no free-swipe
-          gesture (navigation is entirely button-driven), and an animated
-          horizontal ScrollView with scrollEnabled=false never reliably
-          reaches native "idle" here (its scrollTo animation has no touch
-          gesture to settle against), which left a sliver of the previous
-          slide visibly stuck on-screen. A plain conditional render has no
-          such settling step, so it can't get stuck. */}
-      {step === STEP.welcome && (
-        // Slide 1: Welcome -- the one photo-background screen, filled
-        // edge-to-edge (no gap below it: the progress bar/footer float on
-        // top of it via bottomOverlay below, instead of sitting in a
-        // separate strip beneath it). Logo is static and pinned to the
-        // top; the brand block stays anchored to the bottom.
-        <ImageBackground source={scenery} resizeMode="cover" style={[styles.page, styles.heroPage]}>
+      <ScrollView
+        ref={scrollRef}
+        style={styles.scroll}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleMomentumScrollEnd}>
+        {/* Slide 1: Welcome -- the one photo-background screen, filled
+            edge-to-edge (no gap below it: the progress bar/footer float on
+            top of it via bottomOverlay below, instead of sitting in a
+            separate strip beneath it). Logo is static and pinned to the
+            top; the brand block stays anchored to the bottom. */}
+        <ImageBackground source={scenery} resizeMode="cover" style={[styles.page, styles.heroPage, {width, height}]}>
           {/* Subtle white/blue legibility gradient over the upper portion
               only, fading to fully transparent above the mountains -- the
               photo's own sky is already bright, this just guarantees
@@ -229,13 +225,11 @@ export function OnboardingScreen({onDone}: {onDone: () => void}) {
             <Text style={styles.heroSubtitle}>Powerful AI. Private, offline,{'\n'}and on your device.</Text>
           </View>
         </ImageBackground>
-      )}
 
-      {step === STEP.choose && (
-        // Slide 2: Choose the right model -- real catalog, real device
-        // recommendation. A static display of the real recommendation, not
-        // an interactive picker (explicitly requested).
-        <View style={[styles.page, styles.pageLight]}>
+        {/* Slide 2: Choose the right model -- real catalog, real device
+            recommendation. A static display of the real recommendation, not
+            an interactive picker (explicitly requested). */}
+        <View style={[styles.page, styles.pageLight, {width, height}]}>
           <Text style={styles.title}>Choose the right model</Text>
           <Text style={styles.body}>
             We recommend models based on your device's RAM and storage. You can change this anytime.
@@ -252,16 +246,33 @@ export function OnboardingScreen({onDone}: {onDone: () => void}) {
                 recommended={device?.recommendedModelId === model.id}
               />
             ))}
+            {/* Static capability callout, not another selectable model --
+                the real Models tab can search and download any GGUF repo
+                from Hugging Face directly; this just makes sure a new user
+                knows that exists too, beyond the curated list above. */}
+            <View
+              style={[
+                styles.hfCard,
+                {backgroundColor: ONB.surfaceContainer, borderColor: ONB.outlineVariant},
+              ]}>
+              <View style={[styles.hfIconTile, {backgroundColor: ONB.surfaceContainerHigh}]}>
+                <HuggingFaceIcon size={24} />
+              </View>
+              <View style={styles.hfTextCol}>
+                <Text style={styles.hfTitle}>Search Hugging Face</Text>
+                <Text style={styles.hfDesc}>
+                  Not on the list? Download any GGUF model straight from Hugging Face too.
+                </Text>
+              </View>
+            </View>
           </ScrollView>
         </View>
-      )}
 
-      {step === STEP.download && (
-        // Slide 3: Download model -- a static mockup of the UI/structure
-        // only (explicitly requested): no downloadQueue call happens on
-        // this screen, and its Pause/Cancel controls are plain, non-
-        // interactive visuals rather than real buttons.
-        <View style={[styles.page, styles.pageLight]}>
+        {/* Slide 3: Download model -- a static mockup of the UI/structure
+            only (explicitly requested): no downloadQueue call happens on
+            this screen, and its Pause/Cancel controls are plain, non-
+            interactive visuals rather than real buttons. */}
+        <View style={[styles.page, styles.pageLight, {width, height}]}>
           <Text style={styles.title}>Download model</Text>
           <Text style={styles.body}>Get the model and start chatting in just a few minutes.</Text>
           {selectedModel && (
@@ -307,43 +318,45 @@ export function OnboardingScreen({onDone}: {onDone: () => void}) {
             </View>
           )}
         </View>
-      )}
 
-      {step === STEP.privacy && (
-        // Slide 4: Your privacy matters
-        <View style={[styles.page, styles.pageLight]}>
+        {/* Slide 4: Your privacy matters -- redesigned as three distinct
+            icon/title/description feature cards instead of one shield +
+            a plain checklist, matching how most modern app onboarding
+            flows present a short list of privacy facts. */}
+        <View style={[styles.page, styles.pageLight, {width, height}]}>
           <Text style={styles.title}>Your privacy matters</Text>
-          <Text style={styles.body}>Your conversations stay on your device. No data is sent to the cloud.</Text>
-          <View style={styles.diagramSlot}>
-            <View style={[styles.shieldCircle, {backgroundColor: ONB.accentMuted}]}>
-              <Lock size={36} color={ONB.accent} />
-            </View>
-            <View style={styles.checklist}>
-              {CHECKLIST.map(item => (
-                <View key={item} style={styles.checklistRow}>
-                  <Check size={16} color={ONB.success} />
-                  <Text style={[styles.body, styles.checklistText, {color: ONB.textPrimary}]}>{item}</Text>
+          <Text style={styles.body}>Everything below is true the moment you finish setup -- not a promise for later.</Text>
+          <View style={styles.privacyList}>
+            {PRIVACY_FEATURES.map(feature => (
+              <View
+                key={feature.title}
+                style={[styles.privacyCard, {backgroundColor: ONB.surfaceContainer, borderColor: ONB.outlineVariant}]}>
+                <View style={[styles.privacyIconTile, {backgroundColor: feature.tint}]}>
+                  <feature.Icon size={22} color={feature.color} />
                 </View>
-              ))}
-            </View>
+                <View style={styles.privacyTextCol}>
+                  <Text style={styles.privacyCardTitle}>{feature.title}</Text>
+                  <Text style={styles.privacyCardDesc}>{feature.description}</Text>
+                </View>
+              </View>
+            ))}
           </View>
         </View>
-      )}
 
-      {step === STEP.done && (
-        // Slide 5: You're all set -- same photo background as the welcome
-        // slide (explicitly requested), not the plain light surface every
-        // other slide uses. Text stays dark (doneTitle/doneSubtitle were
-        // already ONB.textPrimary/textSecondary), matching the welcome
-        // slide's dark-on-photo treatment. Logo animation is unchanged.
-        <ImageBackground source={scenery} resizeMode="cover" style={[styles.page, styles.donePage]}>
-          <AnimatedLogo size={88} />
+        {/* Slide 5: You're all set -- same photo background as the welcome
+            slide, not the plain light surface every other slide uses. Logo
+            is the same static mark as the welcome slide (no spin -- this
+            closing screen shouldn't animate either), and the Zayla
+            wordmark reappears here too, matching the welcome slide. */}
+        <ImageBackground source={scenery} resizeMode="cover" style={[styles.page, styles.donePage, {width, height}]}>
+          <LogoMark size={132} />
+          <Text style={styles.heroBrand}>Zayla</Text>
           <Text style={styles.doneTitle}>You're all set!</Text>
           <Text style={styles.doneSubtitle}>
             Start your first conversation and experience the power of AI on your device.
           </Text>
         </ImageBackground>
-      )}
+      </ScrollView>
 
       {/* Floats on top of every slide -- including the welcome photo --
           instead of sitting in its own opaque strip beneath the ScrollView,
@@ -413,7 +426,15 @@ export function OnboardingScreen({onDone}: {onDone: () => void}) {
 
 const styles = StyleSheet.create({
   container: {flex: 1},
-  page: {flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32},
+  scroll: {flex: 1},
+  // No height here -- each page passes an explicit {height} (from
+  // useWindowDimensions, alongside {width}) inline instead of `100%`.
+  // A horizontal ScrollView's row-direction content container doesn't
+  // reliably resolve a percentage height down to children on this RN
+  // version (confirmed live: ImageBackground's absolute-fill photo fell
+  // short of the true bottom, leaving a plain white gap), so this uses a
+  // concrete pixel value instead of relying on that resolution at all.
+  page: {alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32},
   // Top-anchored now (matches the reference layout): logo + brand + heading
   // + subtitle cluster together just below the status bar, leaving the
   // photo's scenic lower half open behind the Get Started button/link that
@@ -479,12 +500,30 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: spacing.lg,
   },
-  checklistText: {textAlign: 'left', marginBottom: 0},
   cardHeading: {fontFamily: FONT.semiBold, color: ONB.textPrimary, fontSize: 17},
   caption: {fontFamily: FONT.medium, color: ONB.textPrimary, fontSize: 13},
   small: {fontFamily: FONT.medium, fontSize: 11},
   modelList: {flex: 1},
   modelListContent: {paddingBottom: spacing.lg},
+  hfCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: spacing.md,
+    marginTop: spacing.xs,
+  },
+  hfIconTile: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hfTextCol: {flex: 1, gap: 2},
+  hfTitle: {fontFamily: FONT.semiBold, color: ONB.textPrimary, fontSize: 15},
+  hfDesc: {fontFamily: FONT.body, color: ONB.textSecondary, fontSize: 12, lineHeight: 16},
   downloadCard: {
     borderRadius: radius.lg,
     borderWidth: 1,
@@ -513,17 +552,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingTop: spacing.sm,
   },
-  diagramSlot: {width: '100%', alignItems: 'center', gap: spacing.lg},
-  shieldCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+  privacyList: {width: '100%', gap: spacing.sm},
+  privacyCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: spacing.md,
+  },
+  privacyIconTile: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    alignSelf: 'center',
   },
-  checklist: {gap: spacing.sm, alignSelf: 'stretch', paddingHorizontal: spacing.lg},
-  checklistRow: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm},
+  privacyTextCol: {flex: 1, gap: 2},
+  privacyCardTitle: {fontFamily: FONT.semiBold, color: ONB.textPrimary, fontSize: 15},
+  privacyCardDesc: {fontFamily: FONT.body, color: ONB.textSecondary, fontSize: 13, lineHeight: 18},
   bottomOverlay: {position: 'absolute', left: 0, right: 0, bottom: 0},
   // Welcome-only bottom layout (see JSX comment): button, link, then a
   // compact centered "N / total" counter + short bar right at the bottom

@@ -24,6 +24,7 @@ import {AppSettings, getAppSettings, setAppSettings} from '../storage/appSetting
 import {getActiveModelId, releaseActiveContext} from '../services/llamaSession';
 import {AIPalScaffold} from '../components/AIPalScaffold';
 import {AnalysisRevealCard} from '../components/AnalysisRevealCard';
+import {DeviceAnalysisCard} from '../components/DeviceAnalysisCard';
 import {ModelCard, ModelRowInfo} from '../components/ModelCard';
 import {CollapsibleSection} from '../components/CollapsibleSection';
 import {ModelsFilterMenu} from '../components/ModelsFilterMenu';
@@ -388,6 +389,8 @@ export function ModelsTabScreen({highlightModelId, onNavigate}: Props) {
           {backgroundColor: colors.surface, color: colors.textPrimary, borderColor: colors.border},
         ]}
       />
+
+      <DeviceAnalysisCard />
 
       {recommendedModel && (
         <View style={styles.section}>

@@ -109,6 +109,12 @@ jest.mock('react-native-keychain', () => ({
   resetGenericPassword: jest.fn(() => Promise.resolve(true)),
 }));
 
+// react-native-haptic-feedback's native module isn't available under Jest
+// either -- same pre-existing gap, hit via ChatScreen.tsx.
+jest.mock('react-native-haptic-feedback', () => ({
+  trigger: jest.fn(),
+}));
+
 // react-native-tts constructs a NativeEventEmitter from its native module at
 // import time, which is null under Jest -- hit via ttsService.ts
 // (ChatScreen.tsx -> RootNavigator.tsx).

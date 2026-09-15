@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 import {
   Modal,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Switch,
@@ -168,7 +169,7 @@ export function GenerationSettingsSheet({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={[styles.container, {backgroundColor: colors.background}]}>
+      <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
         <View style={[styles.header, {borderBottomColor: colors.outlineVariant}]}>
           <Text style={typography.heading}>Chat Generation Settings</Text>
           <TouchableOpacity onPress={onClose} hitSlop={8}>
@@ -406,7 +407,7 @@ export function GenerationSettingsSheet({
             <Text style={[styles.saveLabel, {color: colors.onAccent}]}>Save Changes</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }

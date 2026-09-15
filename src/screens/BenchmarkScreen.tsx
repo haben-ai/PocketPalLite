@@ -10,7 +10,6 @@ import {getDownloadedModels} from '../storage/modelRegistry';
 import {getModelById} from '../data/models';
 import {getAppSettings} from '../storage/appSettings';
 import {runBenchmark} from '../services/llamaSession';
-import {getCpuCoreCount} from '../services/deviceCores';
 import {
   BenchmarkRun,
   addBenchmarkRun,
@@ -20,17 +19,12 @@ import {
 } from '../storage/benchmarks';
 import {AIPalScaffold} from '../components/AIPalScaffold';
 import {Card} from '../components/Card';
+import {DeviceAnalysisCard} from '../components/DeviceAnalysisCard';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {ModelPickerList} from '../components/ModelPickerList';
 import {TrashIcon, ChevronDownIcon, SlidersIcon} from '../components/Icons';
 
 type Props = {onNavigate: (screen: AppScreen) => void};
-
-type DeviceSummary = {
-  label: string;
-  coreCount: number | null;
-  totalRamGB: number;
-};
 
 /** Saved benchmark runs can predate a schema/field change (or be left
  * over from a run that failed partway through a much earlier build) --
@@ -124,8 +118,6 @@ export function BenchmarkScreen({onNavigate}: Props) {
   const [downloaded, setDownloaded] = useState<DownloadedModel[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string | undefined>();
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
-  const [device, setDevice] = useState<DeviceSummary | null>(null);
-  const [deviceCardOpen, setDeviceCardOpen] = useState(true);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [pp, setPp] = useState(512);
   const [tg, setTg] = useState(128);
@@ -137,22 +129,12 @@ export function BenchmarkScreen({onNavigate}: Props) {
 
   useEffect(() => {
     (async () => {
-      const [models, savedResults, coreCount, totalMemoryBytes] = await Promise.all([
-        getDownloadedModels(),
-        getBenchmarkRuns(),
-        getCpuCoreCount(),
-        DeviceInfo.getTotalMemory(),
-      ]);
+      const [models, savedResults] = await Promise.all([getDownloadedModels(), getBenchmarkRuns()]);
       setDownloaded(models);
       if (models.length > 0) {
         setSelectedModelId(models[0].modelId);
       }
       setResults(savedResults);
-      setDevice({
-        label: `${DeviceInfo.getBrand()} ${DeviceInfo.getModel()} • Android ${DeviceInfo.getSystemVersion()}`,
-        coreCount,
-        totalRamGB: totalMemoryBytes / 1e9,
-      });
     })();
     // Same one-shot-on-mount pattern the rest of the app's sidebar
     // destinations use -- this screen fully unmounts on navigation away.
@@ -287,28 +269,7 @@ export function BenchmarkScreen({onNavigate}: Props) {
     <AIPalScaffold scroll onBack={() => onNavigate({name: 'chat'})}>
       <Text style={typography.title}>Benchmark</Text>
 
-      {device && (
-        <Card style={styles.deviceCard}>
-          <TouchableOpacity
-            style={styles.deviceHeader}
-            onPress={() => setDeviceCardOpen(v => !v)}
-            activeOpacity={0.7}>
-            <Text style={typography.heading}>Device Information</Text>
-            <View style={{transform: [{rotate: deviceCardOpen ? '180deg' : '0deg'}]}}>
-              <ChevronDownIcon size={18} color={colors.textMuted} />
-            </View>
-          </TouchableOpacity>
-          {deviceCardOpen && (
-            <>
-              <Text style={[typography.caption, styles.deviceLine]}>{device.label}</Text>
-              <Text style={[typography.caption, styles.deviceLine]}>
-                {device.coreCount ? `${device.coreCount} cores • ` : ''}
-                {device.totalRamGB.toFixed(1)} GB RAM
-              </Text>
-            </>
-          )}
-        </Card>
-      )}
+      <DeviceAnalysisCard />
 
       <TouchableOpacity
         style={[
@@ -517,9 +478,6 @@ export function BenchmarkScreen({onNavigate}: Props) {
 }
 
 const styles = StyleSheet.create({
-  deviceCard: {marginTop: spacing.md, marginBottom: spacing.md},
-  deviceHeader: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
-  deviceLine: {marginTop: 4},
   modelSelector: {
     flexDirection: 'row',
     alignItems: 'center',

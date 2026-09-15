@@ -10,6 +10,7 @@ import {getModelById} from '../data/models';
 import {getStoredDeviceTier} from '../services/deviceAnalyzer';
 import {Persona, DeviceTier} from '../types';
 import {AIPalScaffold} from '../components/AIPalScaffold';
+import {DeviceAnalysisCard} from '../components/DeviceAnalysisCard';
 import {PromptSuggestion} from '../components/PromptSuggestion';
 import {AIPalCard} from '../components/AIPalCard';
 import {ModelCard} from '../components/ModelCard';
@@ -59,6 +60,8 @@ export function DiscoverTabScreen({onNavigate}: Props) {
     <AIPalScaffold scroll onBack={() => onNavigate({name: 'chat'})}>
       <Text style={typography.title}>Discover</Text>
       <Text style={[typography.caption, styles.subtitle]}>Ideas for what to try next.</Text>
+
+      <DeviceAnalysisCard />
 
       <View style={styles.section}>
         <Text style={[typography.heading, styles.sectionTitle, {color: colors.textSecondary}]}>

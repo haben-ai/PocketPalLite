@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {Platform, StyleSheet, Text, View} from 'react-native';
 import DeviceInfo from 'react-native-device-info';
 import {spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
@@ -14,8 +14,6 @@ import packageJson from '../../package.json';
 
 type DeviceIds = {
   applicationName: string;
-  bundleId: string;
-  buildNumber: string;
   model: string;
   brand: string;
   systemVersion: string;
@@ -23,20 +21,17 @@ type DeviceIds = {
 
 /**
  * A real "About this app" page: actual installed app identity (name,
- * version, build, package id) read from the native platform via
- * react-native-device-info, not hardcoded strings that could drift from
- * what's really installed -- plus the same on-device-only privacy fact
- * already stated in Settings, and honest credit to the underlying engine.
+ * version) read from the native platform via react-native-device-info, not
+ * hardcoded strings that could drift from what's really installed -- plus
+ * the same on-device-only privacy fact already stated in Settings.
  */
 export function AppInfoScreen({onNavigate}: {onNavigate: (screen: AppScreen) => void}) {
-  const {colors, typography} = useTheme();
+  const {typography} = useTheme();
   const [device, setDevice] = useState<DeviceIds | null>(null);
 
   useEffect(() => {
     setDevice({
       applicationName: DeviceInfo.getApplicationName(),
-      bundleId: DeviceInfo.getBundleId(),
-      buildNumber: DeviceInfo.getBuildNumber(),
       model: DeviceInfo.getModel(),
       brand: DeviceInfo.getBrand(),
       systemVersion: DeviceInfo.getSystemVersion(),
@@ -63,20 +58,6 @@ export function AppInfoScreen({onNavigate}: {onNavigate: (screen: AppScreen) => 
           label="App version"
           control={<Text style={typography.caption}>{packageJson.version}</Text>}
         />
-        {device && (
-          <SettingRow
-            bare
-            label="Build number"
-            control={<Text style={typography.caption}>{device.buildNumber}</Text>}
-          />
-        )}
-        {device && (
-          <SettingRow
-            bare
-            label="Package"
-            control={<Text style={typography.caption}>{device.bundleId}</Text>}
-          />
-        )}
       </SettingSection>
 
       {device && (
@@ -88,7 +69,7 @@ export function AppInfoScreen({onNavigate}: {onNavigate: (screen: AppScreen) => 
           />
           <SettingRow
             bare
-            label="Android version"
+            label={Platform.OS === 'android' ? 'Android version' : 'iOS version'}
             control={<Text style={typography.caption}>{device.systemVersion}</Text>}
           />
         </SettingSection>
@@ -99,21 +80,6 @@ export function AppInfoScreen({onNavigate}: {onNavigate: (screen: AppScreen) => 
           bare
           label="Everything runs on-device"
           description="Chats and models never leave your phone. There is no server this app talks to for chat."
-          control={<View />}
-        />
-      </SettingSection>
-
-      <SettingSection title="Built with">
-        <SettingRow
-          bare
-          label="llama.cpp"
-          description="On-device inference, via the llama.rn bridge."
-          control={<View />}
-        />
-        <SettingRow
-          bare
-          label="React Native"
-          description="Cross-platform app framework."
           control={<View />}
         />
       </SettingSection>
