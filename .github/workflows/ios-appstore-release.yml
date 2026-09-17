@@ -5,12 +5,26 @@ on:
 
 jobs:
   build-and-upload:
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       TEAM_ID: 54L8KA2YV2
       PROFILE_NAME: "Zayla App Store"
     steps:
       - uses: actions/checkout@v4
+
+      # Apple now rejects any App Store upload not built with the iOS 26
+      # SDK (Xcode 26+) -- the runner's own default `xcodebuild` was still
+      # resolving to an older pre-installed Xcode (iOS 17.5 SDK), which
+      # got the upload itself rejected by App Store Connect after a
+      # successful archive/export. `latest-stable` picks whatever the
+      # newest Xcode actually pre-installed on this runner image is,
+      # rather than a version number pinned here that could go stale.
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Show resolved Xcode/SDK version
+        run: xcodebuild -version && xcodebuild -showsdks | grep iphoneos
 
       - uses: actions/setup-node@v4
         with:
