@@ -42,24 +42,33 @@ jobs:
       # provisioning profile has none of that gating; it's the same method
       # CI pipelines have used for years.
       - name: Import signing certificate into a temporary keychain
+        env:
+          CERT_P12_B64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_P12 }}
+          CERT_P12_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
         run: |
           KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
           KEYCHAIN_PASSWORD=$(openssl rand -base64 24)
           CERT_PATH="$RUNNER_TEMP/distribution.p12"
 
-          echo "${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_P12 }}" | base64 --decode > "$CERT_PATH"
+          # printf (not echo) + tr, so an accidental trailing newline/space
+          # picked up when copying a secret's value into GitHub's UI can't
+          # silently turn into a wrong password or a corrupted p12 file.
+          printf '%s' "$CERT_P12_B64" | tr -d '\n\r ' | base64 --decode > "$CERT_PATH"
+          CLEAN_PASSWORD=$(printf '%s' "$CERT_P12_PASSWORD" | tr -d '\n\r')
 
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}" -T /usr/bin/codesign -T /usr/bin/security
+          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$CLEAN_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed 's/"//g')
 
       - name: Install provisioning profile
+        env:
+          PROFILE_B64: ${{ secrets.IOS_PROVISIONING_PROFILE }}
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo "${{ secrets.IOS_PROVISIONING_PROFILE }}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/Zayla_App_Store.mobileprovision
+          printf '%s' "$PROFILE_B64" | tr -d '\n\r ' | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/Zayla_App_Store.mobileprovision
 
       - name: Archive (manual signing)
         working-directory: ios
