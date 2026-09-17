@@ -1,0 +1,98 @@
+name: iOS App Store release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-upload:
+    runs-on: macos-14
+    env:
+      TEAM_ID: 54L8KA2YV2
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Install CocoaPods dependencies
+        working-directory: ios
+        run: pod install
+
+      # xcodebuild/altool auto-discover an App Store Connect API key from
+      # this exact directory + filename convention -- placing it here means
+      # every later step just needs the key ID/issuer ID, never the file
+      # path itself.
+      - name: Install App Store Connect API key
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "${{ secrets.APP_STORE_CONNECT_API_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
+
+      - name: Archive (signed, automatic provisioning)
+        working-directory: ios
+        run: |
+          xcodebuild archive \
+            -workspace PocketPalLite.xcworkspace \
+            -scheme PocketPalLite \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath build/PocketPalLite.xcarchive \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8 \
+            -authenticationKeyID "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}" \
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM="$TEAM_ID"
+
+      - name: Write export options
+        working-directory: ios
+        run: |
+          cat > ExportOptions.plist << PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>teamID</key>
+            <string>$TEAM_ID</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+          </dict>
+          </plist>
+          PLIST
+
+      - name: Export signed .ipa
+        working-directory: ios
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath build/PocketPalLite.xcarchive \
+            -exportPath build/export \
+            -exportOptionsPlist ExportOptions.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8 \
+            -authenticationKeyID "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}"
+
+      - name: Upload to App Store Connect
+        working-directory: ios
+        run: |
+          xcrun altool --upload-app \
+            -f build/export/PocketPalLite.ipa \
+            -t ios \
+            --apiKey "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
+            --apiIssuer "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}"
+
+      # Kept as a downloadable artifact too -- if the CLI upload step above
+      # ever fails (Apple's upload tooling has a history of transient
+      # flakiness), this .ipa can still be uploaded manually via the
+      # Transporter app without re-running the whole archive/export.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PocketPalLite-appstore-ipa
+          path: ios/build/export/PocketPalLite.ipa
+          retention-days: 14
