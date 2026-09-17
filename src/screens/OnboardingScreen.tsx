@@ -118,6 +118,41 @@ function catalogToRow(model: ModelInfo): ModelRowInfo {
   };
 }
 
+// Static display-only entry -- there's no Meta/Llama model in the app's
+// real catalog (data/models.ts) yet, so this isn't backed by a real
+// download the way the Google/Microsoft cards below it are. Explicitly
+// requested as a static card for this screen only; real specs for the
+// actual public model (Llama 3.2 1B Instruct) so it doesn't misrepresent
+// what it's illustrating, even though tapping it does nothing, same as
+// every other card on this screen.
+const META_STATIC_ROW: ModelRowInfo = {
+  id: 'meta-llama-static',
+  name: 'Llama 3.2 1B Instruct',
+  sizeBytes: 807_694_336,
+  tier: 'weak',
+  params: '1B',
+  quant: 'Q4_K_M',
+  minRamGB: 3,
+  vendor: 'meta',
+};
+
+// Exactly four cards, per explicit request: Meta (static -- see above),
+// Google, Microsoft, then the Hugging Face capability card rendered
+// separately below. The Google/Microsoft entries are real catalog models
+// (catalogToRow), not fabricated.
+function curatedOnboardingModels(): ModelRowInfo[] {
+  const rows = [META_STATIC_ROW];
+  const google = getModelById('gemma3-1b');
+  if (google) {
+    rows.push(catalogToRow(google));
+  }
+  const microsoft = getModelById('phi4-mini');
+  if (microsoft) {
+    rows.push(catalogToRow(microsoft));
+  }
+  return rows;
+}
+
 /** Plain, static app mark -- used at the top of the welcome slide. No
  * animation (explicitly requested): a continuously spinning brand mark at
  * the very top of the first screen a user ever sees read as distracting
@@ -226,9 +261,11 @@ export function OnboardingScreen({onDone}: {onDone: () => void}) {
           </View>
         </ImageBackground>
 
-        {/* Slide 2: Choose the right model -- real catalog, real device
-            recommendation. A static display of the real recommendation, not
-            an interactive picker (explicitly requested). */}
+        {/* Slide 2: Choose the right model -- exactly four cards (explicitly
+            requested): Meta (static, see META_STATIC_ROW), Google,
+            Microsoft, then the Hugging Face capability card below. Not the
+            full real catalog -- a curated preview, same "static mockup"
+            spirit as the rest of onboarding. */}
         <View style={[styles.page, styles.pageLight, {width, height}]}>
           <Text style={styles.title}>Choose the right model</Text>
           <Text style={styles.body}>
@@ -238,10 +275,10 @@ export function OnboardingScreen({onDone}: {onDone: () => void}) {
             style={styles.modelList}
             contentContainerStyle={styles.modelListContent}
             showsVerticalScrollIndicator={false}>
-            {MODEL_CATALOG.map(model => (
+            {curatedOnboardingModels().map(model => (
               <OnboardingModelCard
                 key={model.id}
-                model={catalogToRow(model)}
+                model={model}
                 selected={selectedModelId === model.id}
                 recommended={device?.recommendedModelId === model.id}
               />
