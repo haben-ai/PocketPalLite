@@ -1,0 +1,99 @@
+name: iOS App Store screenshots
+
+on:
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    runs-on: macos-15
+    env:
+      BUNDLE_ID: com.zayla.app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Install CocoaPods dependencies
+        working-directory: ios
+        run: pod install
+
+      - name: Build for iOS Simulator
+        working-directory: ios
+        run: |
+          xcodebuild \
+            -workspace PocketPalLite.xcworkspace \
+            -scheme PocketPalLite \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      # Captures a real screenshot of the actual running app (first-launch
+      # screen) at the exact pixel sizes App Store Connect's "6.9-inch" and
+      # "6.5-inch" iPhone display buckets accept -- no mockup/fabricated
+      # UI. Each simulator is created fresh from its device *type* (which
+      # persists across Xcode versions) + the newest installed iOS runtime,
+      # rather than relying on a pre-provisioned named device that may or
+      # may not exist on this runner image.
+      - name: Capture screenshots on required device sizes
+        run: |
+          set -e
+          APP_PATH="$PWD/ios/build/Build/Products/Release-iphonesimulator/PocketPalLite.app"
+          mkdir -p screenshots
+
+          RUNTIME_ID=$(xcrun simctl list runtimes --json | python3 -c "
+          import json, sys
+          runtimes = json.load(sys.stdin)['runtimes']
+          ios = [r for r in runtimes if r['name'].startswith('iOS') and r['isAvailable']]
+          print(sorted(ios, key=lambda r: r['version'])[-1]['identifier'])
+          ")
+          echo "Using runtime: $RUNTIME_ID"
+
+          capture() {
+            device_type_name="$1"
+            label="$2"
+
+            type_id=$(xcrun simctl list devicetypes --json | python3 -c "
+          import json, sys
+          types = json.load(sys.stdin)['devicetypes']
+          print([t['identifier'] for t in types if t['name'] == '$device_type_name'][0])
+          ")
+
+            udid=$(xcrun simctl create "AppStoreShot-$label" "$type_id" "$RUNTIME_ID")
+            xcrun simctl boot "$udid"
+            xcrun simctl bootstatus "$udid" -b
+
+            xcrun simctl install "$udid" "$APP_PATH"
+            xcrun simctl launch "$udid" "$BUNDLE_ID"
+
+            # Cold start on first launch (JS bundle init + native libs) --
+            # give it real time before capturing rather than screenshotting
+            # a half-rendered frame.
+            sleep 20
+
+            xcrun simctl io "$udid" screenshot "screenshots/${label}.png"
+
+            xcrun simctl shutdown "$udid"
+            xcrun simctl delete "$udid"
+          }
+
+          capture "iPhone 16 Pro Max" "6.9in-iPhone16ProMax"
+          capture "iPhone 11 Pro Max" "6.5in-iPhone11ProMax"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: appstore-screenshots
+          path: screenshots/*.png
+          retention-days: 14
