@@ -56,6 +56,18 @@ jobs:
           printf '%s' "$CERT_P12_B64" | tr -d '\n\r ' | base64 --decode > "$CERT_PATH"
           CLEAN_PASSWORD=$(printf '%s' "$CERT_P12_PASSWORD" | tr -d '\n\r')
 
+          # Diagnostic only -- compare these against the known-good values
+          # (p12 sha256 12a3ee6f68a79e3377799a46204e189ff79e79c7a0b68e8f3da904e38fc484d4,
+          # size 3251 bytes, password length 29) to see whether the secret
+          # values themselves are wrong, vs. something else. Never prints
+          # the actual password.
+          echo "Decoded p12 size: $(wc -c < "$CERT_PATH") bytes"
+          echo "Decoded p12 sha256: $(shasum -a 256 "$CERT_PATH" | cut -d' ' -f1)"
+          echo "Password length: ${#CLEAN_PASSWORD} characters"
+          openssl pkcs12 -in "$CERT_PATH" -noout -passin pass:"$CLEAN_PASSWORD" \
+            && echo "openssl verify: PASSWORD CORRECT" \
+            || echo "openssl verify: PASSWORD INCORRECT or CORRUPT FILE"
+
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
