@@ -56,15 +56,21 @@ jobs:
           printf '%s' "$CERT_P12_B64" | tr -d '\n\r ' | base64 --decode > "$CERT_PATH"
           CLEAN_PASSWORD=$(printf '%s' "$CERT_P12_PASSWORD" | tr -d '\n\r')
 
-          # Diagnostic only -- compare these against the known-good values
-          # (p12 sha256 12a3ee6f68a79e3377799a46204e189ff79e79c7a0b68e8f3da904e38fc484d4,
-          # size 3251 bytes, password length 29) to see whether the secret
-          # values themselves are wrong, vs. something else. Never prints
-          # the actual password.
+          # Diagnostic only -- compare against the known-good values (p12
+          # sha256 9149b999e4e208b079e59e2cfea4455fdfbd8e1d1e0a9e91bc3e1f4d34524fe2,
+          # size 3085 bytes, password length 29). -legacy is required here
+          # too: this p12 was deliberately re-exported with OpenSSL's
+          # legacy PKCS12 encryption (RC2/3DES + SHA1 MAC) instead of
+          # OpenSSL 3's new default (AES + SHA256 MAC), because macOS's
+          # native `security import` below can't parse the new default at
+          # all -- it fails with "MAC verification failed" even given the
+          # exact right password. Reading a legacy-encrypted p12 under
+          # OpenSSL 3 needs -legacy too, or this check would wrongly report
+          # failure on an otherwise-correct file.
           echo "Decoded p12 size: $(wc -c < "$CERT_PATH") bytes"
           echo "Decoded p12 sha256: $(shasum -a 256 "$CERT_PATH" | cut -d' ' -f1)"
           echo "Password length: ${#CLEAN_PASSWORD} characters"
-          openssl pkcs12 -in "$CERT_PATH" -noout -passin pass:"$CLEAN_PASSWORD" \
+          openssl pkcs12 -in "$CERT_PATH" -noout -passin pass:"$CLEAN_PASSWORD" -legacy \
             && echo "openssl verify: PASSWORD CORRECT" \
             || echo "openssl verify: PASSWORD INCORRECT or CORRUPT FILE"
 
