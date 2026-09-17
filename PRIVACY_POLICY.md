@@ -77,4 +77,4 @@ If this policy changes, the "Last updated" date at the top will be revised, and 
 
 ## Contact
 
-If you have questions about this privacy policy, contact: **[your contact email here]**
+If you have questions about this privacy policy, contact: **eriland707@gmail.com**
