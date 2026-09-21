@@ -37,8 +37,28 @@ jest.mock('./secureStorage', () => ({
   SECRET_SERVICE: {hfToken: 'pocketpal.hf_token'},
 }));
 
+// Overrides jest.setup.js's global NetInfo mock (which always reports
+// Wi-Fi) so these tests can control connection type per-case -- a local
+// jest.mock() for a module already mocked in setupFiles takes precedence
+// for this file.
+let mockNetInfoType = 'wifi';
+let mockNetInfoListeners: Array<(state: {type: string}) => void> = [];
+jest.mock('@react-native-community/netinfo', () => ({
+  __esModule: true,
+  default: {
+    fetch: jest.fn(() => Promise.resolve({type: mockNetInfoType})),
+    addEventListener: jest.fn((listener: (state: {type: string}) => void) => {
+      mockNetInfoListeners.push(listener);
+      return jest.fn(() => {
+        mockNetInfoListeners = mockNetInfoListeners.filter(l => l !== listener);
+      });
+    }),
+  },
+}));
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {downloadModel, downloadRemoteModel, getFreeStorageBytes, DownloadCancelledError} from './downloadManager';
+import {downloadTranslationModel} from './translationDownloadManager';
 import * as downloadQueue from './downloadQueue';
 
 /** A controllable in-flight handle: the test decides when completion
@@ -56,7 +76,9 @@ function deferredHandle() {
   const cancel = jest.fn(() => {
     rejectFn(new DownloadCancelledError());
   });
-  return {handle: {cancel, completion}, resolveFn, rejectFn, cancel};
+  const pause = jest.fn();
+  const resume = jest.fn();
+  return {handle: {cancel, pause, resume, completion}, resolveFn, rejectFn, cancel, pause, resume};
 }
 
 /** processNext()'s chain (getAppSettings -> startJob -> withHfHeaders ->
@@ -83,7 +105,10 @@ describe('downloadQueue', () => {
     queue.__resetForTests();
     (downloadModel as jest.Mock<any>).mockReset();
     (downloadRemoteModel as jest.Mock<any>).mockReset();
+    (downloadTranslationModel as jest.Mock<any>).mockReset();
     (getFreeStorageBytes as jest.Mock<any>).mockReset().mockResolvedValue(1e12);
+    mockNetInfoType = 'wifi';
+    mockNetInfoListeners = [];
   });
 
   it('runs a single enqueued job and removes it (firing onDone) once it completes', async () => {
@@ -116,6 +141,12 @@ describe('downloadQueue', () => {
     let snapshot = queue.getQueueSnapshot();
     expect(snapshot.find(i => i.descriptor.modelId === 'm1')?.status).toBe('downloading');
     expect(snapshot.find(i => i.descriptor.modelId === 'm2')?.status).toBe('queued');
+    // Wi-Fi gating (getAppSettings + NetInfo.fetch) adds a couple more
+    // async hops between "claimed, status flipped to downloading" and
+    // "downloadModel() actually invoked" -- wait for it rather than
+    // asserting immediately, same reasoning as this file's waitFor() helper
+    // doc comment.
+    await waitFor(() => (downloadModel as jest.Mock<any>).mock.calls.length > 0);
     expect(downloadModel).toHaveBeenCalledTimes(1);
 
     first.resolveFn();
@@ -252,7 +283,86 @@ describe('downloadQueue', () => {
       'X',
       expect.any(Function),
       undefined,
+      'remote:remote-1',
     );
     expect(downloadModel).not.toHaveBeenCalled();
+  });
+
+  it('pause() stops the active job and marks it paused; resume() continues the same handle', async () => {
+    const {handle, pause, resume} = deferredHandle();
+    (downloadModel as jest.Mock<any>).mockResolvedValue(handle);
+
+    await queue.enqueue({kind: 'catalog', modelId: 'm1'});
+    // Status flips to 'downloading' the instant processNext() claims the
+    // item, before the Wi-Fi-gating hop (getAppSettings + NetInfo.fetch)
+    // even runs -- pause() only takes effect once activeHandle is actually
+    // populated, which happens after downloadModel() itself resolves, so
+    // wait for that specifically rather than the status flip alone.
+    await waitFor(() => (downloadModel as jest.Mock<any>).mock.calls.length > 0);
+    await waitFor(() => queue.getQueueSnapshot()[0]?.status === 'downloading');
+
+    queue.pause({kind: 'catalog', modelId: 'm1'});
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(queue.getQueueSnapshot()[0]?.status).toBe('paused');
+
+    queue.resume({kind: 'catalog', modelId: 'm1'});
+    expect(resume).toHaveBeenCalledTimes(1);
+    expect(queue.getQueueSnapshot()[0]?.status).toBe('downloading');
+
+    // Never re-called downloadModel -- resuming reused the same in-memory
+    // handle rather than starting a whole new download.
+    expect(downloadModel).toHaveBeenCalledTimes(1);
+  });
+
+  it('pause() is a no-op for a job kind with no pause capability (translation)', async () => {
+    const completion = new Promise<void>(() => undefined);
+    (downloadTranslationModel as jest.Mock<any>).mockResolvedValue({
+      cancel: jest.fn(),
+      completion,
+    });
+
+    await queue.enqueue({kind: 'translation', modelId: 't1'});
+    await waitFor(() => queue.getQueueSnapshot()[0]?.status === 'downloading');
+
+    queue.pause({kind: 'translation', modelId: 't1'});
+    expect(queue.getQueueSnapshot()[0]?.status).toBe('downloading');
+  });
+
+  it('wifiOnlyDownloads gates a non-Wi-Fi connection to waiting-for-wifi, then auto-starts once Wi-Fi returns', async () => {
+    mockNetInfoType = 'cellular';
+    const {handle} = deferredHandle();
+    (downloadModel as jest.Mock<any>).mockResolvedValue(handle);
+
+    await queue.enqueue({kind: 'catalog', modelId: 'm1'});
+    await waitFor(() => queue.getQueueSnapshot()[0]?.status === 'waiting-for-wifi');
+
+    expect(downloadModel).not.toHaveBeenCalled();
+
+    mockNetInfoType = 'wifi';
+    mockNetInfoListeners.forEach(l => l({type: 'wifi'}));
+
+    await waitFor(() => queue.getQueueSnapshot()[0]?.status === 'downloading');
+    expect(downloadModel).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancelling a job that is waiting-for-wifi unblocks the queue instead of leaving it stuck', async () => {
+    mockNetInfoType = 'cellular';
+    const {handle} = deferredHandle();
+    (downloadModel as jest.Mock<any>).mockResolvedValue(handle);
+
+    await queue.enqueue({kind: 'catalog', modelId: 'm1'});
+    await waitFor(() => queue.getQueueSnapshot()[0]?.status === 'waiting-for-wifi');
+
+    queue.cancel({kind: 'catalog', modelId: 'm1'});
+    await waitFor(() => queue.getQueueSnapshot().length === 0);
+
+    // A second job enqueued afterward must still be able to start -- proof
+    // the queue actually freed up rather than staying wedged on the
+    // cancelled Wi-Fi wait.
+    const second = deferredHandle();
+    (downloadModel as jest.Mock<any>).mockResolvedValue(second.handle);
+    mockNetInfoType = 'wifi';
+    await queue.enqueue({kind: 'catalog', modelId: 'm2'});
+    await waitFor(() => queue.getQueueSnapshot()[0]?.status === 'downloading');
   });
 });

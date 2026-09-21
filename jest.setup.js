@@ -41,6 +41,7 @@ jest.mock('react-native-fs', () => ({
   copyFile: jest.fn(() => Promise.resolve()),
   stat: jest.fn(() => Promise.resolve({size: 0})),
   readFile: jest.fn(() => Promise.resolve('')),
+  readDir: jest.fn(() => Promise.resolve([])),
   hash: jest.fn(() => Promise.resolve('')),
 }));
 
@@ -113,6 +114,19 @@ jest.mock('react-native-keychain', () => ({
 // either -- same pre-existing gap, hit via ChatScreen.tsx.
 jest.mock('react-native-haptic-feedback', () => ({
   trigger: jest.fn(),
+}));
+
+// @react-native-community/netinfo constructs a NativeEventEmitter from its
+// native module at import time (same as react-native-tts below) -- hit via
+// downloadQueue.ts's Wi-Fi-only-downloads gating. Defaults to reporting
+// Wi-Fi so every existing enqueue/download test's behavior is unchanged
+// unless a test explicitly overrides this mock to exercise the gating path.
+jest.mock('@react-native-community/netinfo', () => ({
+  __esModule: true,
+  default: {
+    fetch: jest.fn(() => Promise.resolve({type: 'wifi', isConnected: true})),
+    addEventListener: jest.fn(() => jest.fn()),
+  },
 }));
 
 // react-native-tts constructs a NativeEventEmitter from its native module at

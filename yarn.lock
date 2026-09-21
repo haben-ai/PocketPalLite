@@ -1525,6 +1525,11 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
+"@kesha-antonov/react-native-background-downloader@^4.6.3":
+  version "4.6.3"
+  resolved "https://registry.npmjs.org/@kesha-antonov/react-native-background-downloader/-/react-native-background-downloader-4.6.3.tgz"
+  integrity sha512-0ZJp9m23ym7RwbFMhuPVYu3oo7eCs6q5XaGcgpx5nCV8BRvCsSY35FwtIyb2Q9j2H2Ugqqq8yxLFdofelHEuSg==
+
 "@nicolo-ribaudo/eslint-scope-5-internals@5.1.1-v1":
   version "5.1.1-v1"
   resolved "https://registry.npmjs.org/@nicolo-ribaudo/eslint-scope-5-internals/-/eslint-scope-5-internals-5.1.1-v1.tgz"
@@ -1721,6 +1726,11 @@
     graceful-fs "^4.1.3"
     prompts "^2.4.2"
     semver "^7.5.2"
+
+"@react-native-community/netinfo@^12.0.1":
+  version "12.0.1"
+  resolved "https://registry.npmjs.org/@react-native-community/netinfo/-/netinfo-12.0.1.tgz"
+  integrity sha512-P/3caXIvfYSJG8AWJVefukg+ZGRPs+M4Lp3pNJtgcTYoJxCjWrKQGNnCkj/Cz//zWa/avGed0i/wzm0T8vV2IQ==
 
 "@react-native-documents/picker@10.1.7":
   version "10.1.7"
@@ -6207,7 +6217,7 @@ react-native-vector-icons@^10.2.0:
     prop-types "^15.7.2"
     yargs "^16.1.1"
 
-react-native@*, "react-native@^0.0.0-0 || >=0.65 <1.0", "react-native@>= 0.61.5", react-native@>=0.71.0, react-native@>=0.76.0, react-native@0.76.5:
+react-native@*, "react-native@^0.0.0-0 || >=0.65 <1.0", "react-native@>= 0.61.5", react-native@>=0.57.0, react-native@>=0.59, react-native@>=0.71.0, react-native@>=0.76.0, react-native@0.76.5:
   version "0.76.5"
   resolved "https://registry.npmjs.org/react-native/-/react-native-0.76.5.tgz"
   integrity sha512-op2p2kB+lqMF1D7AdX4+wvaR0OPFbvWYs+VBE7bwsb99Cn9xISrLRLAgFflZedQsa5HvnOGrULhtnmItbIKVVw==

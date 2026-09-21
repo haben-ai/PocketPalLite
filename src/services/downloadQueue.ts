@@ -1,3 +1,4 @@
+import NetInfo from '@react-native-community/netinfo';
 import {getJSON, setJSON, KEYS} from '../storage/asyncStore';
 import {getAppSettings} from '../storage/appSettings';
 import {getModelById} from '../data/models';
@@ -23,7 +24,7 @@ export type QueueJobDescriptor =
   | {kind: 'remote'; modelId: string; url: string; displayName: string; sizeBytes: number}
   | {kind: 'translation'; modelId: string};
 
-export type QueueItemStatus = 'queued' | 'downloading' | 'failed';
+export type QueueItemStatus = 'queued' | 'downloading' | 'paused' | 'waiting-for-wifi' | 'failed';
 
 export type QueueItem = {
   descriptor: QueueJobDescriptor;
@@ -53,7 +54,12 @@ let items: QueueItem[] = [];
 let loaded = false;
 let loadPromise: Promise<void> | null = null;
 let activeJobId: string | null = null;
-let activeHandle: {cancel: () => void} | null = null;
+let activeHandle: {cancel: () => void; pause?: () => void; resume?: () => void} | null = null;
+/** Set by waitForWifi() while a job is parked at 'waiting-for-wifi', so
+ * cancel() can unblock processNext()'s await on it -- otherwise cancelling
+ * a job stuck waiting for Wi-Fi would never actually free up the queue,
+ * since there's no real handle yet for cancel() to call into. */
+let wifiWaitCancel: (() => void) | null = null;
 /** Set synchronously (no await before it) the instant processNext() decides
  * to claim the front-of-queue item, cleared synchronously once that claim
  * finishes. processNext() can be re-entered while an earlier call is still
@@ -93,6 +99,7 @@ export function __resetForTests(): void {
   loadPromise = null;
   activeJobId = null;
   activeHandle = null;
+  wifiWaitCancel = null;
   claiming = false;
   cancelPendingForActiveJob = false;
   listeners.clear();
@@ -136,11 +143,22 @@ function notifyAndPersist(): void {
  * "Add Remote Model"/Hugging Face downloads, and translation models, so
  * only one large download ever runs at a time regardless of source.
  * Queue state + per-item progress persist to AsyncStorage on every change;
- * ensureLoaded() rehydrates it on first use each app session. Anything
- * still marked 'downloading' from a session that ended without finishing
- * (the process was killed) gets requeued rather than left stuck -- it
- * restarts from byte 0 (downloadManager.ts's primitive has no
- * Range-resume), matching how a retry after a real failure also restarts.
+ * ensureLoaded() rehydrates it on first use each app session.
+ *
+ * 'downloading'/'waiting-for-wifi' from a session that ended without
+ * finishing (the process was killed) become 'queued' again -- not because
+ * the transfer itself is lost (catalog/remote jobs run through
+ * downloadModel()/downloadRemoteModel(), which reconnect to any
+ * still-alive native background-downloader task for the same job id
+ * instead of restarting from 0; only translation jobs, still on the
+ * RNFS-based primitive with no real resume, actually restart), but because
+ * this session has no live in-memory handle for it yet -- re-queuing is
+ * what gets processNext() to call startJob() again and either reconnect or
+ * (translation only) genuinely restart.
+ *
+ * 'paused' is left as-is: a user-paused download should stay paused across
+ * a relaunch rather than silently resuming itself. resume() below handles
+ * reconnecting to it when the user taps Resume again.
  */
 async function ensureLoaded(): Promise<void> {
   if (loaded) {
@@ -155,7 +173,8 @@ async function ensureLoaded(): Promise<void> {
       // for real, rather than showing NaN/undefined.
       items = stored.map(i => ({
         ...i,
-        status: i.status === 'downloading' ? ('queued' as const) : i.status,
+        status:
+          i.status === 'downloading' || i.status === 'waiting-for-wifi' ? ('queued' as const) : i.status,
         bytesWritten: i.bytesWritten ?? 0,
         totalBytes: i.totalBytes ?? 0,
       }));
@@ -165,6 +184,21 @@ async function ensureLoaded(): Promise<void> {
     })();
   }
   await loadPromise;
+}
+
+/**
+ * Called once from App.tsx's boot sequence, not just left to happen
+ * whenever the Models screen first mounts -- reconnecting to any live
+ * background-downloader task (getExistingDownloadTasks(), inside
+ * downloadModel()/downloadRemoteModel()) needs to happen as early as
+ * possible after a cold start. The library's own docs warn that iOS
+ * throttles an app's future background transfer time if a finished
+ * session's completeHandler() isn't called promptly -- waiting for the
+ * user to happen to open Models first would leave that unacknowledged for
+ * however long that takes.
+ */
+export async function initDownloadQueue(): Promise<void> {
+  await ensureLoaded();
 }
 
 export function onChange(listener: Listener): () => void {
@@ -233,6 +267,11 @@ export function cancel(descriptor: QueueJobDescriptor): void {
   if (activeJobId === id) {
     if (activeHandle) {
       activeHandle.cancel();
+    } else if (wifiWaitCancel) {
+      // Parked at 'waiting-for-wifi' -- no real handle exists yet (nothing
+      // has actually started transferring), so unblock processNext()'s
+      // await on Wi-Fi instead of leaving it stuck waiting forever.
+      wifiWaitCancel();
     } else {
       // Claimed (status already 'downloading') but startJob() hasn't
       // resolved a real handle yet -- apply it the instant one exists
@@ -242,6 +281,45 @@ export function cancel(descriptor: QueueJobDescriptor): void {
   }
   items = items.filter(i => jobId(i.descriptor) !== id);
   notifyAndPersist();
+}
+
+/** Pauses the actively-downloading job, if it has pause capability
+ * (translation-model jobs, still on the RNFS primitive, don't). A no-op
+ * for anything not currently active -- a queued item has nothing running
+ * to pause. */
+export function pause(descriptor: QueueJobDescriptor): void {
+  const id = jobId(descriptor);
+  if (activeJobId !== id || !activeHandle?.pause) {
+    return;
+  }
+  activeHandle.pause();
+  items = items.map(i => (jobId(i.descriptor) === id ? {...i, status: 'paused' as const} : i));
+  notifyAndPersist();
+}
+
+/** Resumes a paused job. A 'paused' item is, by construction, always the
+ * job that was active when it was paused (pause() only ever applies to the
+ * active job) -- so if this session still has its live handle in memory,
+ * resuming is just calling .resume() on it directly. Otherwise (a cold
+ * relaunch since it was paused) there's nothing live to resume in this
+ * session yet; re-queuing it lets processNext() call startJob() again,
+ * which reconnects to the still-alive native task for this job id and
+ * resumes it itself (see downloadManager.ts's runEngineDownload). */
+export function resume(descriptor: QueueJobDescriptor): void {
+  const id = jobId(descriptor);
+  const item = items.find(i => jobId(i.descriptor) === id);
+  if (!item || item.status !== 'paused') {
+    return;
+  }
+  if (activeJobId === id && activeHandle?.resume) {
+    activeHandle.resume();
+    items = items.map(i => (jobId(i.descriptor) === id ? {...i, status: 'downloading' as const} : i));
+    notifyAndPersist();
+    return;
+  }
+  items = items.map(i => (jobId(i.descriptor) === id ? {...i, status: 'queued' as const} : i));
+  notifyAndPersist();
+  processNext();
 }
 
 /** Re-queues a failed job so it starts over from byte 0. */
@@ -266,14 +344,14 @@ async function startJob(
   descriptor: QueueJobDescriptor,
   onProgress: (fraction: number, bytesWritten: number) => void,
   totalBytes: number,
-): Promise<{cancel: () => void; completion: Promise<void>}> {
+): Promise<{cancel: () => void; pause?: () => void; resume?: () => void; completion: Promise<void>}> {
   if (descriptor.kind === 'catalog') {
     const model = getModelById(descriptor.modelId);
     if (!model) {
       throw new Error('Unknown model');
     }
     const headers = await withHfHeaders();
-    return downloadModel(model, onProgress, headers);
+    return downloadModel(model, onProgress, headers, jobId(descriptor));
   }
   if (descriptor.kind === 'remote') {
     const headers = await withHfHeaders();
@@ -283,6 +361,7 @@ async function startJob(
       descriptor.displayName,
       onProgress,
       headers,
+      jobId(descriptor),
     );
   }
   const translationModel = getTranslationModelById(descriptor.modelId);
@@ -297,6 +376,32 @@ async function startJob(
   return downloadTranslationModel(translationModel, fraction =>
     onProgress(fraction, Math.round(fraction * totalBytes)),
   );
+}
+
+/** Resolves once NetInfo reports a Wi-Fi connection. wifiWaitCancel (module
+ * state) lets cancel() resolve this early if the waiting job gets
+ * cancelled, instead of leaving processNext() blocked forever. */
+function waitForWifi(): Promise<void> {
+  return new Promise<void>(resolve => {
+    let settled = false;
+    let unsubscribe: (() => void) | null = null;
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      unsubscribe?.();
+      wifiWaitCancel = null;
+      resolve();
+    };
+    const subscription = NetInfo.addEventListener(state => {
+      if (state.type === 'wifi') {
+        finish();
+      }
+    });
+    unsubscribe = () => subscription();
+    wifiWaitCancel = finish;
+  });
 }
 
 /**
@@ -341,6 +446,32 @@ async function processNext(): Promise<void> {
     if (!(await hasInternetConnection())) {
       throw new Error('No internet connection. Check your Wi-Fi or mobile data and try again.');
     }
+
+    // Wi-Fi gating: translation jobs are excluded -- they're much smaller
+    // (a few hundred MB) and this setting is specifically about the large
+    // LLM model downloads. Parks the item at 'waiting-for-wifi' rather than
+    // erroring, and blocks the queue on it (matching single-flight) until
+    // Wi-Fi shows up or the setting itself changes.
+    if (claimed.descriptor.kind !== 'translation') {
+      const {wifiOnlyDownloads} = await getAppSettings();
+      if (wifiOnlyDownloads && (await NetInfo.fetch()).type !== 'wifi') {
+        items = items.map(i => (jobId(i.descriptor) === id ? {...i, status: 'waiting-for-wifi' as const} : i));
+        notifyAndPersist();
+        await waitForWifi();
+        // The waiting job may have been cancelled while we waited (that's
+        // what wifiWaitCancel resolving early, rather than real Wi-Fi,
+        // means) -- if so, activeJobId no longer matches (cancel() doesn't
+        // clear it directly, but there's nothing left in `items` for this
+        // id), so just fall through to the finally block instead of
+        // starting a job for an item that no longer exists.
+        if (!items.some(i => jobId(i.descriptor) === id)) {
+          return;
+        }
+        items = items.map(i => (jobId(i.descriptor) === id ? {...i, status: 'downloading' as const} : i));
+        notifyAndPersist();
+      }
+    }
+
     const handle = await startJob(
       claimed.descriptor,
       (fraction, bytesWritten) => {

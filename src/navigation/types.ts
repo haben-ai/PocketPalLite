@@ -1,9 +1,10 @@
 /**
- * Hand-rolled screen state. A persistent bottom tab bar (Chat/Models/AIPals/
- * More, plus a center New Chat action) covers the app's primary sections;
- * "More" is its own screen listing the remaining destinations (Discover/
- * Benchmark/Settings/App Info) that don't get their own tab slot. Each
- * variant carries only the params that screen actually needs.
+ * Hand-rolled screen state. All app-section navigation (Chat/Models/AIPals/
+ * Discover/Benchmark/Settings/App Info) is reached through the hamburger
+ * drawer rather than a bottom tab bar -- a custom bottom bar overlapped the
+ * system navigation bar on some Android devices (e.g. Samsung S20-series
+ * gesture/3-button nav), so it was removed outright rather than patched.
+ * Each variant carries only the params that screen actually needs.
  */
 export type AppScreen =
   | {
@@ -15,7 +16,6 @@ export type AppScreen =
     }
   | {name: 'models'; highlightModelId?: string}
   | {name: 'aipals'}
-  | {name: 'more'}
   | {name: 'discover'}
   | {name: 'settings'}
   | {name: 'benchmark'}

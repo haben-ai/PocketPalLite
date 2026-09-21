@@ -3,7 +3,7 @@ import {StyleSheet, Text, View} from 'react-native';
 import {radius, spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
 import {PrimaryButton} from './PrimaryButton';
-import {PlayIcon, CloseIcon} from './Icons';
+import {PlayIcon, PauseIcon, CloseIcon} from './Icons';
 import {QueueItemStatus} from '../services/downloadQueue';
 
 function formatBytes(bytes: number): string {
@@ -40,11 +40,12 @@ function formatEta(seconds: number): string {
  * JS-thread animation cost for a purely decorative effect and showed
  * nothing about actual transfer size or time remaining -- exactly the gap
  * between this app's download UI and a reference app's (real % + size +
- * ETA + a keep-the-app-open tip) that prompted this rewrite. No Pause
- * button: the underlying transfer (RNFS's downloadFile) has no true
- * Range-resume, so a retry after Cancel/failure always restarts from byte
- * 0 -- offering a "Pause" that silently re-downloads everything on
- * "Resume" would be a worse lie than just not having the button.
+ * ETA + a keep-the-app-open tip) that prompted this rewrite. Pause/Resume
+ * became possible once the transfer engine moved to
+ * @kesha-antonov/react-native-background-downloader, which has real
+ * byte-range resume -- unlike the RNFS-based engine it replaced, "Resume"
+ * genuinely continues from where it left off instead of silently
+ * re-downloading everything.
  */
 export function NeuralDownloadProgress({
   fraction,
@@ -55,6 +56,8 @@ export function NeuralDownloadProgress({
   error,
   onCancel,
   onRetry,
+  onPause,
+  onResume,
 }: {
   fraction: number;
   status: QueueItemStatus;
@@ -73,11 +76,17 @@ export function NeuralDownloadProgress({
   error?: string;
   onCancel: () => void;
   onRetry?: () => void;
+  /** Undefined for a job kind that can't pause (e.g. translation models,
+   * still on the old RNFS engine) -- the button just doesn't render. */
+  onPause?: () => void;
+  onResume?: () => void;
 }) {
   const {colors, typography} = useTheme();
   const isActive = status === 'downloading';
   const isFailed = status === 'failed';
   const isQueued = status === 'queued';
+  const isPaused = status === 'paused';
+  const isWaitingForWifi = status === 'waiting-for-wifi';
 
   // Exponential moving average over consecutive progress ticks (0.3 weight
   // on the newest sample) -- a raw instantaneous delta between two ticks
@@ -109,6 +118,10 @@ export function NeuralDownloadProgress({
   let title: string;
   if (isQueued) {
     title = queuePosition ? `Queued (#${queuePosition})` : 'Queued';
+  } else if (isWaitingForWifi) {
+    title = 'Waiting for Wi-Fi';
+  } else if (isPaused) {
+    title = 'Paused';
   } else if (isFailed) {
     title = 'Download failed';
   } else {
@@ -119,11 +132,17 @@ export function NeuralDownloadProgress({
     ? error
     : isQueued
     ? 'Waiting for the current download to finish'
+    : isWaitingForWifi
+    ? 'Will resume automatically once Wi-Fi is available'
+    : isPaused && totalBytes > 0
+    ? `${formatBytes(bytesWritten)} / ${formatBytes(totalBytes)} · Paused`
     : totalBytes > 0
     ? `${formatBytes(bytesWritten)} / ${formatBytes(totalBytes)}${eta ? ` · ${eta}` : ''}`
     : formatBytes(bytesWritten);
 
   const canRetry = isFailed && !!onRetry;
+  const canPause = isActive && !!onPause;
+  const canResume = isPaused && !!onResume;
 
   return (
     <View style={styles.container}>
@@ -157,6 +176,24 @@ export function NeuralDownloadProgress({
             label="Retry"
             variant="secondary"
             onPress={onRetry!}
+            style={styles.actionButton}
+            icon={color => <PlayIcon size={18} color={color} />}
+          />
+        )}
+        {canPause && (
+          <PrimaryButton
+            label="Pause"
+            variant="secondary"
+            onPress={onPause!}
+            style={styles.actionButton}
+            icon={color => <PauseIcon size={18} color={color} />}
+          />
+        )}
+        {canResume && (
+          <PrimaryButton
+            label="Resume"
+            variant="secondary"
+            onPress={onResume!}
             style={styles.actionButton}
             icon={color => <PlayIcon size={18} color={color} />}
           />

@@ -42,6 +42,8 @@ type ModelCardDownloadState = {
   error?: string;
   cancel: () => void;
   retry?: () => void;
+  pause?: () => void;
+  resume?: () => void;
 };
 
 type ReadyItem = {row: ModelRowInfo; entry: DownloadedModel};
@@ -173,6 +175,8 @@ export function ModelsTabScreen({highlightModelId, onNavigate}: Props) {
       error: item.error,
       cancel: () => downloadQueue.cancel(item.descriptor),
       retry: () => downloadQueue.retry(item.descriptor),
+      pause: () => downloadQueue.pause(item.descriptor),
+      resume: () => downloadQueue.resume(item.descriptor),
     };
   };
 

@@ -6,22 +6,18 @@ import {AppScreen} from './types';
 import {ChatTabScreen} from '../screens/ChatTabScreen';
 import {ModelsTabScreen} from '../screens/ModelsTabScreen';
 import {AIPalsTabScreen} from '../screens/AIPalsTabScreen';
-import {MoreScreen} from '../screens/MoreScreen';
 import {DiscoverTabScreen} from '../screens/DiscoverTabScreen';
 import {SettingsTabScreen} from '../screens/SettingsTabScreen';
 import {BenchmarkScreen} from '../screens/BenchmarkScreen';
 import {AppInfoScreen} from '../screens/AppInfoScreen';
 import {OpenSourceLicensesScreen} from '../screens/OpenSourceLicensesScreen';
-import {BottomTabBar} from '../components/BottomTabBar';
 import {DialogHost} from '../components/AppDialog';
 
 /**
- * A persistent bottom tab bar (Chat/Models/New Chat/AIPals/More) sits below
- * whichever screen is current, as a flex sibling rather than an overlay --
- * every screen (including Chat's own keyboard-avoiding composer) just gets
- * less total height to lay out in, no per-screen bottom padding needed to
- * avoid being covered. "More" covers Discover/Benchmark/Settings/App Info,
- * which don't get their own tab slot.
+ * Whichever screen is current fills the whole area -- no persistent bottom
+ * tab bar (removed: it overlapped the system nav bar on some Android
+ * devices, e.g. Samsung S20-series gesture/3-button nav). All app-section
+ * navigation lives in ChatTabScreen's hamburger drawer instead.
  */
 export function RootNavigator({initialScreen}: {initialScreen?: AppScreen}) {
   const {colors} = useTheme();
@@ -69,9 +65,6 @@ export function RootNavigator({initialScreen}: {initialScreen?: AppScreen}) {
     case 'aipals':
       content = <AIPalsTabScreen onNavigate={setScreen} />;
       break;
-    case 'more':
-      content = <MoreScreen onNavigate={setScreen} />;
-      break;
     case 'discover':
       content = <DiscoverTabScreen onNavigate={setScreen} />;
       break;
@@ -104,7 +97,6 @@ export function RootNavigator({initialScreen}: {initialScreen?: AppScreen}) {
   return (
     <View style={{flex: 1, backgroundColor: colors.background}}>
       <View style={{flex: 1}}>{content}</View>
-      <BottomTabBar current={screen.name} onNavigate={setScreen} />
       {/* Mounted once here rather than per-screen -- every Alert.alert()
           call anywhere in the app (imported from AppDialog instead of
           react-native) renders through this single host. */}

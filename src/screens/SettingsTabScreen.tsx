@@ -491,6 +491,35 @@ export function SettingsTabScreen({onNavigate}: {onNavigate: (screen: AppScreen)
         />
       </SettingSection>
 
+      <SettingSection title="Downloads">
+        <SettingRow
+          bare
+          label="Wi-Fi only"
+          description="Only download models over Wi-Fi -- pauses and waits if you're on cellular."
+          control={
+            <Switch
+              value={settings.wifiOnlyDownloads}
+              onValueChange={v => patch({wifiOnlyDownloads: v})}
+              trackColor={{false: colors.surfaceContainerHigh, true: colors.accent}}
+              thumbColor={colors.textPrimary}
+            />
+          }
+        />
+        <SettingRow
+          bare
+          label="Background downloads"
+          description="Keep downloading after you minimize the app."
+          control={
+            <Switch
+              value={settings.backgroundDownloadsEnabled}
+              onValueChange={v => patch({backgroundDownloadsEnabled: v})}
+              trackColor={{false: colors.surfaceContainerHigh, true: colors.accent}}
+              thumbColor={colors.textPrimary}
+            />
+          }
+        />
+      </SettingSection>
+
       <SettingSection title={t('settings.appSettings')}>
         <SettingRow
           bare

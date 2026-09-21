@@ -24,7 +24,17 @@ import {
 import {getDownloadedModels} from '../storage/modelRegistry';
 import {CapabilityBadge} from './Badge';
 import {ModelPickerList} from './ModelPickerList';
-import {NewChatIcon} from './Icons';
+import {AppScreen} from '../navigation/types';
+import {
+  NewChatIcon,
+  HomeIcon,
+  GridIcon,
+  MaskIcon,
+  SparkleIcon,
+  SpeedometerIcon,
+  GearIcon,
+  InfoIcon,
+} from './Icons';
 
 const DRAWER_WIDTH = Math.min(320, Dimensions.get('window').width * 0.84);
 
@@ -56,19 +66,33 @@ function formatRelativeDate(ts: number): string {
   return new Date(ts).toLocaleDateString(undefined, {month: 'short', day: 'numeric'});
 }
 
+const APP_SECTION_ITEMS: {icon: (color: string) => React.ReactNode; label: string; screen: AppScreen}[] = [
+  {icon: color => <HomeIcon color={color} />, label: 'Chat', screen: {name: 'chat'}},
+  {icon: color => <GridIcon color={color} />, label: 'Models', screen: {name: 'models'}},
+  {icon: color => <MaskIcon color={color} />, label: 'AIPals', screen: {name: 'aipals'}},
+  {icon: color => <SparkleIcon color={color} />, label: 'Discover', screen: {name: 'discover'}},
+  {icon: color => <SpeedometerIcon color={color} />, label: 'Benchmark', screen: {name: 'benchmark'}},
+  {icon: color => <GearIcon color={color} />, label: 'Settings', screen: {name: 'settings'}},
+  {icon: color => <InfoIcon color={color} />, label: 'App Info', screen: {name: 'appInfo'}},
+];
+
 /**
  * Conversation history sidebar: New chat fixed at top, a scrollable
- * conversation list below it. App-section navigation (Models/AIPals/More)
- * now lives in the persistent bottom tab bar instead of here.
+ * conversation list, then an "App" section for every other destination
+ * (Chat/Models/AIPals/Discover/Benchmark/Settings/App Info) -- this used to
+ * live in a separate bottom tab bar, removed because it overlapped the
+ * system nav bar on some Android devices.
  */
 export function ConversationDrawer({
   visible,
   onClose,
   onOpenConversation,
+  onNavigate,
 }: {
   visible: boolean;
   onClose: () => void;
   onOpenConversation: (modelId: string, conversationId: string) => void;
+  onNavigate: (screen: AppScreen) => void;
 }) {
   const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -222,6 +246,25 @@ export function ConversationDrawer({
               </TouchableOpacity>
             );
           }}
+          ListFooterComponent={
+            <View>
+              <Text style={[typography.small, styles.sectionLabel, {color: colors.textMuted}]}>
+                App
+              </Text>
+              {APP_SECTION_ITEMS.map(item => (
+                <TouchableOpacity
+                  key={item.label}
+                  style={styles.menuRow}
+                  onPress={() => {
+                    onClose();
+                    onNavigate(item.screen);
+                  }}>
+                  {item.icon(colors.textPrimary)}
+                  <Text style={typography.body}>{item.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          }
         />
       </Animated.View>
     </View>

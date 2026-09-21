@@ -7,6 +7,7 @@ import {AppScreen} from './src/navigation/types';
 import {ensureBuiltInPersonaSeeded} from './src/storage/personas';
 import {getAppSettings, ensureNThreadsTuned} from './src/storage/appSettings';
 import {releaseActiveContext} from './src/services/llamaSession';
+import {initDownloadQueue} from './src/services/downloadQueue';
 import {analyzeDevice, getStoredDeviceTier, setStoredDeviceTier} from './src/services/deviceAnalyzer';
 import {ThemeProvider} from './src/theme/ThemeContext';
 import {initI18n} from './src/i18n';
@@ -27,6 +28,12 @@ export default function App() {
       // own doc comment). Runs before getAppSettings() below so Chat's
       // first model load already sees the tuned value.
       await ensureNThreadsTuned();
+      // Reconnects to any model download that kept running natively while
+      // the app was backgrounded/killed, as early in boot as possible --
+      // see initDownloadQueue()'s own doc comment for why this can't just
+      // wait for the user to open the Models screen. Best-effort: a
+      // failure here shouldn't block the rest of app boot.
+      initDownloadQueue().catch(() => undefined);
       const settings = await getAppSettings();
       initI18n(settings.language);
       const seen = await hasSeenOnboarding();

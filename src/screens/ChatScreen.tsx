@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -95,6 +96,7 @@ export function ChatScreen({
   conversationId,
   personaId,
   initialInput,
+  autoFocus,
   onOpenDrawer,
   onNewChat,
   onConversationImported,
@@ -104,6 +106,9 @@ export function ChatScreen({
   personaId: string;
   /** Pre-fills the composer (unsent) -- used by Discover's suggested tasks. */
   initialInput?: string;
+  /** Pop the keyboard once the model finishes loading -- true for a new/home
+   * entry into Chat, false when resuming a specific past conversation. */
+  autoFocus?: boolean;
   onOpenDrawer: () => void;
   /** Starts a fresh conversation with the given (live, current) model/persona. */
   onNewChat: (modelId: string, personaId: string) => void;
@@ -137,6 +142,7 @@ export function ChatScreen({
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const streamingTextRef = useRef<string | null>(null);
   const stoppedRef = useRef(false);
+  const composerRef = useRef<TextInput>(null);
 
   const model = getModelById(activeModelId);
   // Header/AI-indicator display name only -- drops tuning-suffix words
@@ -216,6 +222,16 @@ export function ChatScreen({
       cancelled = true;
     };
   }, [activeModelId, conversationId, personaId, reloadTick]);
+
+  // Pops the keyboard once the composer actually becomes usable (ready) --
+  // not before, since it's `editable={false}` and disabled-looking while
+  // the model is still loading. autoFocus is false for resuming a specific
+  // past conversation (reopening it to read isn't an intent to type).
+  useEffect(() => {
+    if (ready && autoFocus) {
+      composerRef.current?.focus();
+    }
+  }, [ready, autoFocus]);
 
   // Auto Offload releases the active context on background; if that
   // happened while this screen was already mounted, bump reloadTick on
@@ -762,6 +778,7 @@ export function ChatScreen({
         )}
 
         <ChatComposer
+          ref={composerRef}
           value={input}
           onChangeText={setInput}
           onSend={handleSend}

@@ -8,35 +8,43 @@ import {useTheme} from '../theme/ThemeContext';
 /**
  * Extracted from ChatScreen.tsx's former inline composer JSX -- pure
  * presentational, all state (input text, pending image, streaming status)
- * stays owned by ChatScreen and is passed down as props.
+ * stays owned by ChatScreen and is passed down as props. Forwards a ref to
+ * the underlying TextInput so ChatScreen can call .focus() on it directly
+ * (e.g. to auto-pop the keyboard on landing on a new/home chat).
  */
-export function ChatComposer({
-  value,
-  onChangeText,
-  onSend,
-  onStop,
-  onAttach,
-  pendingImagePath,
-  onRemoveImage,
-  ready,
-  isGenerating,
-  isVisionModel,
-  editingLabel,
-  onCancelEdit,
-}: {
-  value: string;
-  onChangeText: (text: string) => void;
-  onSend: () => void;
-  onStop: () => void;
-  onAttach?: () => void;
-  pendingImagePath?: string | null;
-  onRemoveImage?: () => void;
-  ready: boolean;
-  isGenerating: boolean;
-  isVisionModel: boolean;
-  editingLabel?: string | null;
-  onCancelEdit?: () => void;
-}) {
+export const ChatComposer = React.forwardRef<
+  TextInput,
+  {
+    value: string;
+    onChangeText: (text: string) => void;
+    onSend: () => void;
+    onStop: () => void;
+    onAttach?: () => void;
+    pendingImagePath?: string | null;
+    onRemoveImage?: () => void;
+    ready: boolean;
+    isGenerating: boolean;
+    isVisionModel: boolean;
+    editingLabel?: string | null;
+    onCancelEdit?: () => void;
+  }
+>(function ChatComposer(
+  {
+    value,
+    onChangeText,
+    onSend,
+    onStop,
+    onAttach,
+    pendingImagePath,
+    onRemoveImage,
+    ready,
+    isGenerating,
+    isVisionModel,
+    editingLabel,
+    onCancelEdit,
+  },
+  ref,
+) {
   const canSend = ready && !isGenerating && (!!value.trim() || !!pendingImagePath);
   const {colors, typography} = useTheme();
   const {t} = useTranslation();
@@ -82,6 +90,7 @@ export function ChatComposer({
           </TouchableOpacity>
         )}
         <TextInput
+          ref={ref}
           value={value}
           onChangeText={onChangeText}
           placeholder={ready ? t('chat.messagePlaceholder') : 'Loading model ...'}
@@ -113,7 +122,7 @@ export function ChatComposer({
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   editingRow: {

@@ -23,6 +23,11 @@ type ActiveConversation = {
   conversationId: string;
   personaId: string;
   initialInput?: string;
+  /** Pop the keyboard once the composer is ready -- true for a new/home
+   * entry into Chat (cold launch, New Chat, new AIPal chat), false when
+   * resuming a specific past conversation (reopening it to read is not an
+   * intent to start typing immediately). */
+  autoFocus: boolean;
 };
 
 /**
@@ -49,6 +54,7 @@ export function ChatTabScreen({
           conversationId,
           personaId: personaId ?? BUILT_IN_PERSONA_ID,
           initialInput: prefillText,
+          autoFocus: false,
         });
       } else if (modelId) {
         // No existing conversation -- start a new one for this model.
@@ -58,6 +64,7 @@ export function ChatTabScreen({
           conversationId: conversation.id,
           personaId: personaId ?? BUILT_IN_PERSONA_ID,
           initialInput: prefillText,
+          autoFocus: true,
         });
       } else if (personaId) {
         // Persona-only deep link (Discover's "recently used AIPal"): use
@@ -76,6 +83,7 @@ export function ChatTabScreen({
             conversationId: conversation.id,
             personaId,
             initialInput: prefillText,
+            autoFocus: true,
           });
         }
       } else {
@@ -97,12 +105,14 @@ export function ChatTabScreen({
             modelId: mostRecent.modelId,
             conversationId: conversation.id,
             personaId: mostRecent.personaId ?? BUILT_IN_PERSONA_ID,
+            autoFocus: true,
           });
         } else if (mostRecent) {
           setActive({
             modelId: mostRecent.modelId,
             conversationId: mostRecent.id,
             personaId: mostRecent.personaId ?? BUILT_IN_PERSONA_ID,
+            autoFocus: false,
           });
         }
       }
@@ -121,6 +131,7 @@ export function ChatTabScreen({
         modelId,
         conversationId,
         personaId: conversation?.personaId ?? BUILT_IN_PERSONA_ID,
+        autoFocus: false,
       });
     });
   }, []);
@@ -131,6 +142,7 @@ export function ChatTabScreen({
         modelId: newChatModelId,
         conversationId: conversation.id,
         personaId: newChatPersonaId,
+        autoFocus: true,
       });
     });
   }, []);
@@ -147,6 +159,7 @@ export function ChatTabScreen({
           modelId: conversation.modelId,
           conversationId: conversation.id,
           personaId: conversation.personaId ?? BUILT_IN_PERSONA_ID,
+          autoFocus: false,
         });
       }
     });
@@ -166,6 +179,7 @@ export function ChatTabScreen({
           visible={drawerOpen}
           onClose={() => setDrawerOpen(false)}
           onOpenConversation={handleOpenConversation}
+          onNavigate={onNavigate}
         />
       </AIPalScaffold>
     );
@@ -179,6 +193,7 @@ export function ChatTabScreen({
         conversationId={active.conversationId}
         personaId={active.personaId}
         initialInput={active.initialInput}
+        autoFocus={active.autoFocus}
         onOpenDrawer={() => setDrawerOpen(true)}
         onNewChat={handleNewChat}
         onConversationImported={handleConversationImported}
@@ -187,6 +202,7 @@ export function ChatTabScreen({
         visible={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onOpenConversation={handleOpenConversation}
+        onNavigate={onNavigate}
       />
     </>
   );

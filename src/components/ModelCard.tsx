@@ -125,6 +125,10 @@ export function ModelCard({
     error?: string;
     cancel: () => void;
     retry?: () => void;
+    /** Undefined for a job kind that can't pause (e.g. translation models,
+     * still on the old RNFS engine). */
+    pause?: () => void;
+    resume?: () => void;
   };
   device?: DeviceTier;
   highlighted?: boolean;
@@ -292,6 +296,8 @@ export function ModelCard({
           error={downloadState.error}
           onCancel={downloadState.cancel}
           onRetry={downloadState.retry}
+          onPause={downloadState.pause}
+          onResume={downloadState.resume}
         />
       )}
     </Card>

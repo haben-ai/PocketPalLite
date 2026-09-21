@@ -91,6 +91,13 @@ export type AppSettings = {
   modelsSortMode: 'recommended' | 'name' | 'size';
   /** Models screen: split each section into Text / Vision groups. */
   modelsGroupByType: boolean;
+
+  /** Only download models over Wi-Fi -- a queued/in-progress download waits
+   * (rather than errors) until Wi-Fi is available. */
+  wifiOnlyDownloads: boolean;
+  /** Let model downloads keep running via the OS after the app is
+   * backgrounded or its process is killed, instead of stopping outright. */
+  backgroundDownloadsEnabled: boolean;
 };
 
 /** The exact set of values llama.rn's public ContextParams type accepts for
@@ -146,6 +153,8 @@ const DEFAULTS: AppSettings = {
   modelsFilterMode: 'all',
   modelsSortMode: 'recommended',
   modelsGroupByType: false,
+  wifiOnlyDownloads: true,
+  backgroundDownloadsEnabled: true,
 };
 
 export {DEFAULTS as APP_SETTINGS_DEFAULTS};

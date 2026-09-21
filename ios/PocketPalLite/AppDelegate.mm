@@ -1,6 +1,7 @@
 #import "AppDelegate.h"
 
 #import <React/RCTBundleURLProvider.h>
+#import <RNBackgroundDownloader.h>
 
 @implementation AppDelegate
 
@@ -12,6 +13,17 @@
   self.initialProps = @{};
 
   return [super application:application didFinishLaunchingWithOptions:launchOptions];
+}
+
+// Required by @kesha-antonov/react-native-background-downloader: iOS calls
+// this to hand back control of a model download's NSURLSession background
+// session that kept transferring while the app was suspended/terminated --
+// without it, a finished/failed background download's completion event
+// never reaches the library (or downloadManager.ts's completeHandler()
+// call), and the model download would appear to just hang.
+- (void)application:(UIApplication *)application handleEventsForBackgroundURLSession:(NSString *)identifier completionHandler:(void (^)(void))completionHandler
+{
+  [RNBackgroundDownloader setCompletionHandlerWithIdentifier:identifier completionHandler:completionHandler];
 }
 
 - (NSURL *)sourceURLForBridge:(RCTBridge *)bridge
