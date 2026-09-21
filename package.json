@@ -8,6 +8,7 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
+    "postinstall": "patch-package",
     "gen:licenses": "npx --yes license-checker --production --json --out .tmp-licenses.json && node scripts/generate-third-party-licenses.js .tmp-licenses.json && node -e \"require('fs').unlinkSync('.tmp-licenses.json')\""
   },
   "dependencies": {
@@ -54,6 +55,7 @@
     "babel-jest": "^29.6.3",
     "eslint": "^8.19.0",
     "jest": "^29.6.3",
+    "patch-package": "^8.0.1",
     "prettier": "2.8.8",
     "react-test-renderer": "18.3.1",
     "typescript": "5.0.4"

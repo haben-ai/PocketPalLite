@@ -3,10 +3,26 @@ import {
   createDownloadTask,
   getExistingDownloadTasks,
   completeHandler,
+  setConfig,
 } from '@kesha-antonov/react-native-background-downloader';
 import type {DownloadTask as BgDownloadTask} from '@kesha-antonov/react-native-background-downloader';
 import {ModelInfo} from '../types';
 import {registerDownloadedModel} from '../storage/modelRegistry';
+
+// KNOWN ISSUE (as of this commit): a real download's HTTP exchange succeeds
+// (verified: the server returns a clean 200 with a correct Content-Length,
+// no chunked encoding, no gzip) and onBegin fires, but no bytes ever reach
+// disk and HttpURLConnection.getContentLengthLong() reports -1 despite the
+// real header being present -- something is stuck between the header
+// exchange succeeding and the native read loop actually starting, inside
+// this library's Kotlin ResumableDownloader.executeDownload(). Verbose
+// native logs left on deliberately so the next debugging pass starts with
+// real diagnostics instead of re-discovering this from scratch. Safe to
+// leave on for now -- this code path doesn't work end-to-end yet anyway.
+// Remove once the underlying bug is fixed.
+setConfig({isLogsEnabled: true, logCallback: (tag, message, ...args) => {
+  console.log(`[BGD:${tag}]`, message, ...args);
+}});
 
 // A function, not a module-scope constant -- RNFS.DocumentDirectoryPath is a
 // native-module property, and reading it at module-evaluation time means a

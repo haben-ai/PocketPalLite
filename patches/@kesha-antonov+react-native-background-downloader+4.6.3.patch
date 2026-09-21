@@ -1,0 +1,46 @@
+diff --git a/node_modules/@kesha-antonov/react-native-background-downloader/lib/index.js b/node_modules/@kesha-antonov/react-native-background-downloader/lib/index.js
+index b41bb0f..e2ee3e4 100644
+--- a/node_modules/@kesha-antonov/react-native-background-downloader/lib/index.js
++++ b/node_modules/@kesha-antonov/react-native-background-downloader/lib/index.js
+@@ -36,8 +36,16 @@ function ensureNativeModuleInitialized() {
+         RNBackgroundDownloader = Object.assign(turboModule, constants);
+     }
+     else {
+-        // Fall back to old architecture - must use NativeModules for proper event emission
+-        RNBackgroundDownloader = react_native_1.NativeModules.RNBackgroundDownloader;
++        // Fall back to old architecture - must use NativeModules for proper event emission.
++        // PATCHED (see patches/@kesha-antonov+react-native-background-downloader+*.patch):
++        // on Android in Bridgeless mode, NativeModules.RNBackgroundDownloader is always
++        // undefined (Bridgeless doesn't populate the legacy bridge registry), even though
++        // the module is correctly registered as a TurboModule and TurboModuleRegistry.get()
++        // finds it fine -- falling back to the already-fetched turboModule reference here
++        // fixes that without touching the iOS-specific branch above or the event-emitter
++        // wiring below (NativeEventEmitter works fine with a TurboModule reference; it
++        // only needs addListener/removeListeners, which the spec provides either way).
++        RNBackgroundDownloader = react_native_1.NativeModules.RNBackgroundDownloader ?? turboModule;
+         // For old architecture, constants may need to be fetched via getConstants() as well
+         if (RNBackgroundDownloader && !RNBackgroundDownloader.documents && typeof RNBackgroundDownloader.getConstants === 'function') {
+             const constants = RNBackgroundDownloader.getConstants();
+diff --git a/node_modules/@kesha-antonov/react-native-background-downloader/src/index.ts b/node_modules/@kesha-antonov/react-native-background-downloader/src/index.ts
+index 530669b..0302040 100644
+--- a/node_modules/@kesha-antonov/react-native-background-downloader/src/index.ts
++++ b/node_modules/@kesha-antonov/react-native-background-downloader/src/index.ts
+@@ -41,8 +41,16 @@ function ensureNativeModuleInitialized (): RNBackgroundDownloaderModule & Native
+     const constants = turboModule.getConstants()
+     RNBackgroundDownloader = Object.assign(turboModule, constants) as RNBackgroundDownloaderModule & NativeModule
+   } else {
+-    // Fall back to old architecture - must use NativeModules for proper event emission
+-    RNBackgroundDownloader = NativeModules.RNBackgroundDownloader
++    // Fall back to old architecture - must use NativeModules for proper event emission.
++    // PATCHED (see patches/@kesha-antonov+react-native-background-downloader+*.patch):
++    // on Android in Bridgeless mode, NativeModules.RNBackgroundDownloader is always
++    // undefined (Bridgeless doesn't populate the legacy bridge registry), even though
++    // the module is correctly registered as a TurboModule and TurboModuleRegistry.get()
++    // finds it fine -- falling back to the already-fetched turboModule reference here
++    // fixes that without touching the iOS-specific branch above or the event-emitter
++    // wiring below (NativeEventEmitter works fine with a TurboModule reference; it
++    // only needs addListener/removeListeners, which the spec provides either way).
++    RNBackgroundDownloader = (NativeModules.RNBackgroundDownloader ?? turboModule) as RNBackgroundDownloaderModule & NativeModule
+ 
+     // For old architecture, constants may need to be fetched via getConstants() as well
+     if (RNBackgroundDownloader && !RNBackgroundDownloader.documents && typeof RNBackgroundDownloader.getConstants === 'function') {
