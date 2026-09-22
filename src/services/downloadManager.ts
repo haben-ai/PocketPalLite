@@ -1,28 +1,13 @@
+import {Platform} from 'react-native';
 import RNFS from 'react-native-fs';
 import {
   createDownloadTask,
   getExistingDownloadTasks,
   completeHandler,
-  setConfig,
 } from '@kesha-antonov/react-native-background-downloader';
 import type {DownloadTask as BgDownloadTask} from '@kesha-antonov/react-native-background-downloader';
 import {ModelInfo} from '../types';
 import {registerDownloadedModel} from '../storage/modelRegistry';
-
-// KNOWN ISSUE (as of this commit): a real download's HTTP exchange succeeds
-// (verified: the server returns a clean 200 with a correct Content-Length,
-// no chunked encoding, no gzip) and onBegin fires, but no bytes ever reach
-// disk and HttpURLConnection.getContentLengthLong() reports -1 despite the
-// real header being present -- something is stuck between the header
-// exchange succeeding and the native read loop actually starting, inside
-// this library's Kotlin ResumableDownloader.executeDownload(). Verbose
-// native logs left on deliberately so the next debugging pass starts with
-// real diagnostics instead of re-discovering this from scratch. Safe to
-// leave on for now -- this code path doesn't work end-to-end yet anyway.
-// Remove once the underlying bug is fixed.
-setConfig({isLogsEnabled: true, logCallback: (tag, message, ...args) => {
-  console.log(`[BGD:${tag}]`, message, ...args);
-}});
 
 // A function, not a module-scope constant -- RNFS.DocumentDirectoryPath is a
 // native-module property, and reading it at module-evaluation time means a
@@ -31,6 +16,32 @@ setConfig({isLogsEnabled: true, logCallback: (tag, message, ...args) => {
 // inside an awaitable, catchable async call.
 function modelsDir(): string {
   return `${RNFS.DocumentDirectoryPath}/models`;
+}
+
+// On Android below API 34, @kesha-antonov/react-native-background-downloader
+// hands most downloads to the OS's own system DownloadManager rather than
+// running the transfer in-process. That system service runs as a separate
+// UID from this app and can't write into this app's private internal
+// storage sandbox (RNFS.DocumentDirectoryPath, where modelFilePath() below
+// lives) -- pointing a DownloadManager request there doesn't throw, it just
+// silently never writes a byte (onBegin still fires, progress stays at
+// 0/-1 forever, no error is ever surfaced). DownloadManager CAN write to
+// this app's external-files directory (this is the destination the
+// library's own native source comments document as the intended one), so
+// every background-downloader-engine transfer is staged there instead and
+// moved into its real internal-storage location once it finishes. iOS has
+// no equivalent restriction (its background session writes straight into
+// the app's own sandbox), so this only changes anything on Android.
+function stagingDir(): string {
+  return `${RNFS.ExternalDirectoryPath}/download-staging`;
+}
+
+function engineDestinationFor(finalPath: string): string {
+  if (Platform.OS !== 'android') {
+    return finalPath;
+  }
+  const fileName = finalPath.slice(finalPath.lastIndexOf('/') + 1);
+  return `${stagingDir()}/${fileName}`;
 }
 
 // Runs at most once per app session (ensureModelsDir() is called on every
@@ -72,11 +83,15 @@ export async function ensureModelsDir(): Promise<void> {
   if (!exists) {
     await RNFS.mkdir(dir);
     stalePartFilesSwept = true;
-    return;
-  }
-  if (!stalePartFilesSwept) {
+  } else if (!stalePartFilesSwept) {
     stalePartFilesSwept = true;
     await sweepStalePartFiles(dir);
+  }
+  if (Platform.OS === 'android') {
+    const staging = stagingDir();
+    if (!(await RNFS.exists(staging))) {
+      await RNFS.mkdir(staging);
+    }
   }
 }
 
@@ -311,9 +326,22 @@ function runEngineDownload(
   // -- whatever terminal event the native side fires next after it does.
   let stopped = false;
   let task: BgDownloadTask | undefined = existingTask;
+  const engineDestination = engineDestinationFor(destination);
+  // cancel() calls this directly instead of only waiting on a native
+  // error/done event after stop() -- on Android, most transfers run through
+  // the OS's own DownloadManager (see runEngineDownload's doc comment
+  // above), and removing a DownloadManager download doesn't reliably fire a
+  // completion broadcast the library can translate into that event. Without
+  // this, cancel() would leave `completion` (and so the queue's activeJobId
+  // lock -- see downloadQueue.ts's processNext()) unsettled forever,
+  // permanently blocking every later download for the rest of the app
+  // session. Calling reject() here is safe even if the native event does
+  // still arrive afterward -- a promise only ever settles once.
+  let rejectPending: ((err: Error) => void) | null = null;
 
   function attachAndWait(t: BgDownloadTask): Promise<void> {
     return new Promise<void>((resolve, reject) => {
+      rejectPending = reject;
       t.progress(({bytesDownloaded, bytesTotal}) => {
         const fraction = bytesTotal > 0 ? bytesDownloaded / bytesTotal : 0;
         onProgress(fraction, bytesDownloaded);
@@ -353,7 +381,7 @@ function runEngineDownload(
       }
       await wait;
     } else {
-      const freshTask = createDownloadTask({id: taskId, url, destination, headers});
+      const freshTask = createDownloadTask({id: taskId, url, destination: engineDestination, headers});
       task = freshTask;
       const wait = attachAndWait(freshTask);
       freshTask.start();
@@ -361,11 +389,16 @@ function runEngineDownload(
     }
 
     if (sha256) {
-      const digest = await RNFS.hash(destination, 'sha256');
+      const digest = await RNFS.hash(engineDestination, 'sha256');
       if (digest.toLowerCase() !== sha256.toLowerCase()) {
-        await RNFS.unlink(destination).catch(() => undefined);
+        await RNFS.unlink(engineDestination).catch(() => undefined);
         throw new ChecksumMismatchError(sha256, digest);
       }
+    }
+
+    if (engineDestination !== destination) {
+      await RNFS.unlink(destination).catch(() => undefined);
+      await RNFS.moveFile(engineDestination, destination);
     }
   })();
 
@@ -374,6 +407,7 @@ function runEngineDownload(
     cancel: () => {
       stopped = true;
       task?.stop().catch(() => undefined);
+      rejectPending?.(new DownloadCancelledError());
     },
     pause: () => {
       task?.pause().catch(() => undefined);
