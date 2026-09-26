@@ -110,6 +110,16 @@ export default function App() {
         <OnboardingScreen
           onDone={async () => {
             await setOnboardingSeen();
+            // RootNavigator only reads its initialScreen prop once, at
+            // mount -- it never re-reads storage on its own. That prop was
+            // captured above at boot, *before* onboarding ran, so it can't
+            // see whatever OnboardingScreen (or the pre-existing "Explore
+            // Settings" link) just wrote to lastScreen. Re-reading it here,
+            // right before the route switch that mounts RootNavigator for
+            // the first time, is what actually lets onboarding hand off to
+            // a specific screen/chat instead of always landing on a bare
+            // new Chat.
+            setInitialScreen(await getJSON<AppScreen | undefined>(KEYS.lastScreen, undefined));
             setRoute({screen: 'app'});
           }}
         />
