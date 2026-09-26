@@ -1,7 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
   Image,
-  ImageBackground,
   NativeScrollEvent,
   NativeSyntheticEvent,
   PermissionsAndroid,
@@ -12,153 +11,189 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
+  ViewStyle,
 } from 'react-native';
-import {ArrowRight, EyeOff, Lock, WifiOff} from 'lucide-react-native';
-import Svg, {Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
-import {PrimaryButton} from '../components/PrimaryButton';
-import {OnboardingModelCard} from '../components/OnboardingModelCard';
-import {HuggingFaceIcon} from '../components/HuggingFaceIcon';
-import {ModelRowInfo, formatSize} from '../components/ModelCard';
-import {lightColors} from '../theme/light';
-import {radius, spacing} from '../theme';
+import {ArrowLeft} from 'lucide-react-native';
+import DeviceInfo from 'react-native-device-info';
+import {PalMascot} from '../components/PalMascot';
+import {NeuralDownloadProgress} from '../components/NeuralDownloadProgress';
+import {formatSize} from '../components/ModelCard';
+import {ONBOARDING_USE_CASES, OnboardingUseCase} from '../data/onboardingPals';
 import {KEYS, setJSON} from '../storage/asyncStore';
 import {MODEL_CATALOG, getModelById} from '../data/models';
 import {getStoredDeviceTier} from '../services/deviceAnalyzer';
+import {getDownloadedModel} from '../storage/modelRegistry';
+import {createPersona} from '../storage/personas';
+import * as downloadQueue from '../services/downloadQueue';
 import {DeviceTier, ModelInfo} from '../types';
 
-const scenery = require('../assets/images/onboarding-scenery.jpg');
 const logoTransparent = require('../assets/images/logo-transparent.png');
 
-// Three distinct icon/color pairings per feature (rather than one shield +
-// a plain checklist) -- a common pattern in polished onboarding flows,
-// where each privacy fact gets its own visual identity instead of reading
-// as one undifferentiated list.
-const PRIVACY_FEATURES = [
-  {
-    Icon: WifiOff,
-    tint: '#0081FB1F',
-    color: '#0081FB',
-    title: '100% Offline',
-    description: 'Works fully without an internet connection once your model is downloaded.',
-  },
-  {
-    Icon: Lock,
-    tint: '#1FA9711F',
-    color: '#1FA971',
-    title: 'On-Device Only',
-    description: 'Conversations are processed and stored only on your phone -- never uploaded.',
-  },
-  {
-    Icon: EyeOff,
-    tint: '#7C5CFC1F',
-    color: '#7C5CFC',
-    title: 'No Tracking',
-    description: 'No analytics, no accounts, nothing sent to any server, ever.',
-  },
-];
-
-const SLIDE_COUNT = 5;
-const STEP = {welcome: 0, choose: 1, download: 2, privacy: 3, done: 4} as const;
-
-// Fixed, illustrative progress for the download screen -- this step is a
-// static mockup of the UI/structure only (explicitly requested, and now
-// explicitly non-interactive too), not a real download; scaled against the
-// real selected model's real size so the numbers shown are at least
-// internally consistent, not just copied from a reference screenshot
-// verbatim regardless of which model is selected.
-const MOCK_PROGRESS_FRACTION = 0.68;
-const MOCK_ETA_LABEL = 'About 1 min left';
-
-// Onboarding always renders in this fixed light/whitish-blue palette (see
-// theme/light.ts), never the app's own resolved (possibly dark) theme --
-// explicitly requested: every onboarding screen must read as white with a
-// blue accent regardless of the device's system dark/light setting.
-const ONB = lightColors;
-
-// Deep navy -- explicitly specified for the welcome slide's brand/heading
-// text (reference spec: "~#10294A"), distinct from the pure-black
-// ONB.textPrimary used everywhere else in onboarding.
-const NAVY = '#10294A';
-const NAVY_MUTED = '#4A5D78';
-
-// Static Nunito Sans weight instances bundled at
-// android/app/src/main/assets/fonts/NunitoSans-*.ttf (generated from
-// Google's variable Nunito Sans font, per the explicit typography spec --
-// modern rounded geometric sans, distinct from the app's own default font,
-// used only within onboarding). No fontWeight is set alongside these --
-// each weight is already its own separate font file/family, so adding a
-// numeric fontWeight on top would make Android synthesize extra (faux)
-// bold rather than pick a different real face.
-const FONT = {
-  brand: 'NunitoSans-Bold',
-  heading: 'NunitoSans-ExtraBold',
-  body: 'NunitoSans-Regular',
-  medium: 'NunitoSans-Medium',
-  semiBold: 'NunitoSans-SemiBold',
+/**
+ * Dark-mode-first onboarding palette (OLED black + warm amber), deliberately
+ * separate from theme/dark.ts and theme/light.ts -- onboarding always
+ * renders in this exact palette regardless of the device's system theme,
+ * same "fixed, not theme-driven" convention the previous light-mode-only
+ * onboarding used, just inverted to match this design's dark-first spec.
+ */
+const C = {
+  background: '#000000',
+  card: '#16161E',
+  cardBorder: '#2A2A36',
+  cardHigh: '#1E1E27',
+  accent: '#E8A87C',
+  accentSoft: '#F4B886',
+  onAccent: '#1A1206',
+  textPrimary: '#F5F1EC',
+  textSecondary: '#B7B3AE',
+  textMuted: '#7D7A76',
+  white: '#FFFFFF',
+  black: '#000000',
 };
 
-// Reserves space at the bottom of every slide so its content never sits
-// underneath the floating progress-bar + footer overlay (see bottomOverlay
-// below, which renders on top of every slide -- including, on the welcome
-// slide, on top of the photo -- rather than pushing slides up in normal
-// layout flow).
-const FOOTER_RESERVE = 168;
+// Georgia and the platform's generic 'serif' alias are both real, already-
+// installed system fonts on iOS/Android respectively -- gives the reference
+// design's serif display headlines without bundling a new font file (which
+// would need native project changes on both platforms).
+const SERIF = Platform.select({ios: 'Georgia', default: 'serif'});
 
-function catalogToRow(model: ModelInfo): ModelRowInfo {
-  return {
-    id: model.id,
-    name: model.name,
-    sizeBytes: model.sizeBytes + (model.mmprojSizeBytes ?? 0),
-    tier: model.tier,
-    capability: model.capability,
-    params: model.params,
-    quant: model.quant,
-    minRamGB: model.minRamGB,
-    vendor: model.vendor,
-  };
-}
+const STEP = {
+  welcome: 0,
+  offline: 1,
+  comparison: 2,
+  privacy: 3,
+  useCase: 4,
+  reveal: 5,
+} as const;
+const SEGMENT_COUNT = 4; // Steps 0-3 only -- the grid/reveal steps have no segmented bar (per spec).
+const SLIDE_COUNT = 6;
 
-// Static display-only entry -- there's no Meta/Llama model in the app's
-// real catalog (data/models.ts) yet, so this isn't backed by a real
-// download the way the Google/Microsoft cards below it are. Explicitly
-// requested as a static card for this screen only; real specs for the
-// actual public model (Llama 3.2 1B Instruct) so it doesn't misrepresent
-// what it's illustrating, even though tapping it does nothing, same as
-// every other card on this screen.
-const META_STATIC_ROW: ModelRowInfo = {
-  id: 'meta-llama-static',
-  name: 'Llama 3.2 1B Instruct',
-  sizeBytes: 807_694_336,
-  tier: 'weak',
-  params: '1B',
-  quant: 'Q4_K_M',
-  minRamGB: 3,
-  vendor: 'meta',
-};
+type RevealMode = 'picking' | 'downloading' | 'ready' | 'error';
 
-// Exactly four cards, per explicit request: Meta (static -- see above),
-// Google, Microsoft, then the Hugging Face capability card rendered
-// separately below. The Google/Microsoft entries are real catalog models
-// (catalogToRow), not fabricated.
-function curatedOnboardingModels(): ModelRowInfo[] {
-  const rows = [META_STATIC_ROW];
-  const google = getModelById('gemma3-1b');
-  if (google) {
-    rows.push(catalogToRow(google));
-  }
-  const microsoft = getModelById('phi4-mini');
-  if (microsoft) {
-    rows.push(catalogToRow(microsoft));
-  }
-  return rows;
-}
-
-/** Plain, static app mark -- used at the top of the welcome slide. No
- * animation (explicitly requested): a continuously spinning brand mark at
- * the very top of the first screen a user ever sees read as distracting
- * rather than polished, per that request. */
-function LogoMark({size = 72}: {size?: number}) {
+// The plain app mark (not a pal's own mascot) shown on the welcome screen --
+// reuses the bundled transparent logo asset rather than another SVG glyph.
+function LogoMark({size = 64}: {size?: number}) {
   return <Image source={logoTransparent} resizeMode="contain" style={{width: size, height: size}} />;
+}
+
+function PillButton({
+  label,
+  onPress,
+  disabled,
+  style,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  style?: ViewStyle;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.85}
+      style={[styles.pillButton, {backgroundColor: C.white}, disabled && {opacity: 0.4}, style]}>
+      <Text style={styles.pillButtonLabel}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function BackCircleButton({onPress}: {onPress: () => void}) {
+  return (
+    <TouchableOpacity onPress={onPress} hitSlop={10} style={styles.backCircle} activeOpacity={0.8}>
+      <ArrowLeft size={20} color={C.textPrimary} />
+    </TouchableOpacity>
+  );
+}
+
+function SegmentedProgress({activeIndex}: {activeIndex: number}) {
+  return (
+    <View style={styles.segmentRow}>
+      {Array.from({length: SEGMENT_COUNT}).map((_, i) => (
+        <View
+          key={i}
+          style={[
+            styles.segment,
+            {backgroundColor: i <= activeIndex ? C.accent : 'rgba(255,255,255,0.14)'},
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+function TopBar({
+  activeSegment,
+  skipLabel,
+  onSkip,
+}: {
+  activeSegment: number | null;
+  skipLabel: string;
+  onSkip: () => void;
+}) {
+  return (
+    <View style={styles.topBar}>
+      <View style={styles.topBarProgressSlot}>
+        {activeSegment !== null && <SegmentedProgress activeIndex={activeSegment} />}
+      </View>
+      <TouchableOpacity onPress={onSkip} hitSlop={10}>
+        <Text style={styles.skipLabel}>{skipLabel}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+/** Bold word(s) highlighted with the amber pill background used throughout
+ * the reference spec (e.g. "No internet, no signal", "quick and private").
+ * Renders as a single Text run so the highlight wraps naturally with the
+ * surrounding sentence instead of forcing a line break around it. */
+function Highlight({children}: {children: string}) {
+  return <Text style={styles.highlight}>{children}</Text>;
+}
+
+const GB = 1024 * 1024 * 1024;
+
+/** Three real catalog models framed as Quick/Balanced/Best, using the same
+ * device-fit logic deviceAnalyzer.ts already applies elsewhere (Balanced
+ * reuses its actual recommendedModelId rather than recomputing a separate
+ * "sweet spot" heuristic) -- Quick/Best are simply the smallest/largest
+ * text model that still fits the device's free storage. */
+function pickModelTiers(
+  device: DeviceTier | null,
+): {label: string; model: ModelInfo; recommended: boolean}[] {
+  const freeGB = device?.freeStorageGB ?? Infinity;
+  const textModels = MODEL_CATALOG.filter(m => (m.capability ?? 'text') === 'text');
+  const fitting = textModels.filter(
+    m => (m.sizeBytes + (m.mmprojSizeBytes ?? 0)) / GB < freeGB - 0.5,
+  );
+  const pool = fitting.length > 0 ? fitting : textModels;
+  const sorted = [...pool].sort((a, b) => a.sizeBytes - b.sizeBytes);
+  if (sorted.length === 0) {
+    return [];
+  }
+  const quick = sorted[0];
+  const best = sorted[sorted.length - 1];
+  const recommended = device ? getModelById(device.recommendedModelId) : undefined;
+  const recommendedFits = recommended && pool.some(m => m.id === recommended.id);
+  const balanced =
+    recommendedFits && recommended!.id !== quick.id && recommended!.id !== best.id
+      ? recommended!
+      : sorted[Math.floor(sorted.length / 2)];
+
+  const rows = [
+    {label: 'Quick', model: quick, recommended: false},
+    {label: 'Balanced', model: balanced, recommended: true},
+    {label: 'Best', model: best, recommended: false},
+  ];
+  // Dedupe by model id -- a small catalog can make two tiers collide.
+  const seen = new Set<string>();
+  return rows.filter(row => {
+    if (seen.has(row.model.id)) {
+      return false;
+    }
+    seen.add(row.model.id);
+    return true;
+  });
 }
 
 export function OnboardingScreen({onDone}: {onDone: () => void}) {
@@ -167,17 +202,24 @@ export function OnboardingScreen({onDone}: {onDone: () => void}) {
   const [step, setStep] = useState(0);
 
   const [device, setDevice] = useState<DeviceTier | null>(null);
+  const [deviceLabel, setDeviceLabel] = useState('');
+  const [selectedUseCase, setSelectedUseCase] = useState<OnboardingUseCase>(ONBOARDING_USE_CASES[0]);
   const [selectedModelId, setSelectedModelId] = useState<string | undefined>();
+  const [revealMode, setRevealMode] = useState<RevealMode>('picking');
+  const [revealError, setRevealError] = useState<string | undefined>();
+  const [queueItems, setQueueItems] = useState<downloadQueue.QueueItem[]>([]);
+
+  const selectedModelIdRef = useRef(selectedModelId);
+  selectedModelIdRef.current = selectedModelId;
+  const selectedUseCaseRef = useRef(selectedUseCase);
+  selectedUseCaseRef.current = selectedUseCase;
+  const finishedRef = useRef(false);
 
   const goToStep = (next: number) => {
     setStep(next);
     scrollRef.current?.scrollTo({x: next * width, animated: true});
   };
 
-  // Real swipe navigation (the ScrollView below has no scrollEnabled prop,
-  // so it defaults to true) -- this just keeps `step` (which drives the
-  // footer/progress UI) in sync with wherever the user's own drag actually
-  // lands, same as goToStep does for button taps.
   const handleMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const index = Math.round(e.nativeEvent.contentOffset.x / width);
     if (index !== step) {
@@ -185,275 +227,373 @@ export function OnboardingScreen({onDone}: {onDone: () => void}) {
     }
   };
 
-  // Real device recommendation (App.tsx computes this once, ever, right
-  // after onboarding starts -- see deviceAnalyzer.ts), not mock content --
-  // pre-selects a sensible model and flags it as "Recommended" the same way
-  // the real Models tab does. The Choose-model slide itself is a static
-  // display of this real result, not an interactive picker.
   useEffect(() => {
     (async () => {
       const tier = await getStoredDeviceTier();
       setDevice(tier);
       setSelectedModelId(tier?.recommendedModelId ?? MODEL_CATALOG[0]?.id);
+      setDeviceLabel(
+        `${DeviceInfo.getModel()}${tier ? ` • ${tier.totalRamGB.toFixed(1)} GB RAM` : ''}${
+          tier ? ` • ${tier.freeStorageGB.toFixed(1)} GB free` : ''
+        }`,
+      );
     })();
   }, []);
 
-  // Requested placement: the notification permission prompt appears when
-  // onboarding's own last screen is reached, not at cold start -- App.tsx's
-  // own request is gated off for a first-run user for exactly this reason
-  // (see its comment), so this is the only place it fires for them.
   useEffect(() => {
-    if (step === STEP.done && Platform.OS === 'android' && Platform.Version >= 33) {
+    const unsubscribeChange = downloadQueue.onChange(setQueueItems);
+    const unsubscribeDone = downloadQueue.onDone(async descriptor => {
+      if (
+        finishedRef.current ||
+        descriptor.kind !== 'catalog' ||
+        descriptor.modelId !== selectedModelIdRef.current
+      ) {
+        return;
+      }
+      await completeWithPersona();
+    });
+    return () => {
+      unsubscribeChange();
+      unsubscribeDone();
+    };
+    // Mount-only subscription -- reads current selection via refs above so
+    // it never needs to resubscribe as the user changes their pick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const requestNotificationPermission = () => {
+    if (Platform.OS === 'android' && Platform.Version >= 33) {
       PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS).catch(() => undefined);
     }
-  }, [step]);
+  };
 
+  /** Creates the real, persistent AIPal for the use-case the user picked,
+   * then stages the chat screen to open directly into a new conversation
+   * with it once onDone() (the outer prop) fires -- mirrors how a real
+   * "new AIPal chat" already works elsewhere (ChatTabScreen's personaId +
+   * modelId branch), not a bespoke onboarding-only path. */
+  const completeWithPersona = async () => {
+    if (finishedRef.current) {
+      return;
+    }
+    finishedRef.current = true;
+    const useCase = selectedUseCaseRef.current;
+    const modelId = selectedModelIdRef.current;
+    try {
+      const persona = await createPersona({
+        name: useCase.palName,
+        tagline: useCase.palTagline,
+        avatarIcon: useCase.avatarIcon,
+        systemPrompt: useCase.systemPrompt,
+        defaultModelId: modelId,
+      });
+      await setJSON(KEYS.lastScreen, {name: 'chat', modelId, personaId: persona.id}).catch(() => undefined);
+      setRevealMode('ready');
+      requestNotificationPermission();
+    } catch (err) {
+      finishedRef.current = false;
+      setRevealMode('error');
+      setRevealError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const startDownload = async () => {
+    const modelId = selectedModelIdRef.current;
+    if (!modelId) {
+      return;
+    }
+    setRevealError(undefined);
+    const already = await getDownloadedModel(modelId).catch(() => undefined);
+    if (already) {
+      await completeWithPersona();
+      return;
+    }
+    setRevealMode('downloading');
+    try {
+      await downloadQueue.enqueue({kind: 'catalog', modelId});
+    } catch (err) {
+      setRevealMode('error');
+      setRevealError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const activeQueueItem = queueItems.find(
+    i => i.descriptor.kind === 'catalog' && i.descriptor.modelId === selectedModelId,
+  );
+  const queuePosition = activeQueueItem
+    ? queueItems.filter(i => i.status === 'queued').indexOf(activeQueueItem) + 1
+    : undefined;
+
+  const selectedDescriptor = selectedModelId
+    ? ({kind: 'catalog', modelId: selectedModelId} as const)
+    : undefined;
+
+  const modelTiers = pickModelTiers(device);
   const selectedModel = selectedModelId ? getModelById(selectedModelId) : undefined;
-  const storageNeededBytes = selectedModel ? selectedModel.sizeBytes + (selectedModel.mmprojSizeBytes ?? 0) : 0;
-  const mockDownloadedBytes = Math.round(storageNeededBytes * MOCK_PROGRESS_FRACTION);
 
-  const finishToSettings = async () => {
-    // Rides the same "resume where you left off" mechanism ChatScreen's
-    // background/foreground restore uses (RootNavigator reads this same
-    // key on its very first mount) -- "Explore Settings" genuinely lands
-    // there instead of just being a relabeled "Start Chatting".
-    await setJSON(KEYS.lastScreen, {name: 'settings'}).catch(() => undefined);
+  const finishAndEnter = () => {
     onDone();
   };
 
+  const skip = () => onDone();
+
   return (
-    <View style={[styles.container, {backgroundColor: ONB.background}]}>
+    <View style={[styles.container, {backgroundColor: C.background}]}>
       <ScrollView
         ref={scrollRef}
         style={styles.scroll}
         horizontal
         pagingEnabled
+        scrollEnabled={step < STEP.useCase}
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={handleMomentumScrollEnd}>
-        {/* Slide 1: Welcome -- the one photo-background screen, filled
-            edge-to-edge (no gap below it: the progress bar/footer float on
-            top of it via bottomOverlay below, instead of sitting in a
-            separate strip beneath it). Logo is static and pinned to the
-            top; the brand block stays anchored to the bottom. */}
-        <ImageBackground source={scenery} resizeMode="cover" style={[styles.page, styles.heroPage, {width, height}]}>
-          {/* Subtle white/blue legibility gradient over the upper portion
-              only, fading to fully transparent above the mountains -- the
-              photo's own sky is already bright, this just guarantees
-              contrast for the dark navy text on any device/photo variance,
-              per the reference's "subtle white/blue translucent gradient
-              overlay". Built with react-native-svg (already a dependency)
-              rather than adding a gradient package. */}
-          <Svg style={styles.heroGradient} width="100%" height="58%">
-            <Defs>
-              <LinearGradient id="heroFade" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor="#EAF4FF" stopOpacity={0.55} />
-                <Stop offset="0.7" stopColor="#EAF4FF" stopOpacity={0.18} />
-                <Stop offset="1" stopColor="#EAF4FF" stopOpacity={0} />
-              </LinearGradient>
-            </Defs>
-            <Rect x="0" y="0" width="100%" height="100%" fill="url(#heroFade)" />
-          </Svg>
-          <View style={styles.heroTop}>
-            <LogoMark size={132} />
-            <Text style={styles.heroBrand}>Zayla</Text>
-            <Text style={styles.heroHeading}>AI that stays{'\n'}with you.</Text>
-            <Text style={styles.heroSubtitle}>Powerful AI. Private, offline,{'\n'}and on your device.</Text>
-          </View>
-        </ImageBackground>
-
-        {/* Slide 2: Choose the right model -- exactly four cards (explicitly
-            requested): Meta (static, see META_STATIC_ROW), Google,
-            Microsoft, then the Hugging Face capability card below. Not the
-            full real catalog -- a curated preview, same "static mockup"
-            spirit as the rest of onboarding. */}
-        <View style={[styles.page, styles.pageLight, {width, height}]}>
-          <Text style={styles.title}>Choose the right model</Text>
-          <Text style={styles.body}>
-            We recommend models based on your device's RAM and storage. You can change this anytime.
+        {/* Screen 1: Welcome */}
+        <View style={[styles.page, {width, height}]}>
+          <LogoMark size={80} />
+          <Text style={styles.eyebrow}>Welcome to Zayla</Text>
+          <Text style={styles.headline}>Meet your{'\n'}pals.</Text>
+          <Text style={styles.subtitle}>
+            Smart little friends that live inside your phone. Let's get you set up -- it'll take a minute.
           </Text>
-          <ScrollView
-            style={styles.modelList}
-            contentContainerStyle={styles.modelListContent}
-            showsVerticalScrollIndicator={false}>
-            {curatedOnboardingModels().map(model => (
-              <OnboardingModelCard
-                key={model.id}
-                model={model}
-                selected={selectedModelId === model.id}
-                recommended={device?.recommendedModelId === model.id}
-              />
-            ))}
-            {/* Static capability callout, not another selectable model --
-                the real Models tab can search and download any GGUF repo
-                from Hugging Face directly; this just makes sure a new user
-                knows that exists too, beyond the curated list above. */}
-            <View
-              style={[
-                styles.hfCard,
-                {backgroundColor: ONB.surfaceContainer, borderColor: ONB.outlineVariant},
-              ]}>
-              <View style={[styles.hfIconTile, {backgroundColor: ONB.surfaceContainerHigh}]}>
-                <HuggingFaceIcon size={24} />
-              </View>
-              <View style={styles.hfTextCol}>
-                <Text style={styles.hfTitle}>Search Hugging Face</Text>
-                <Text style={styles.hfDesc}>
-                  Not on the list? Download any GGUF model straight from Hugging Face too.
-                </Text>
-              </View>
-            </View>
-          </ScrollView>
         </View>
 
-        {/* Slide 3: Download model -- a static mockup of the UI/structure
-            only (explicitly requested): no downloadQueue call happens on
-            this screen, and its Pause/Cancel controls are plain, non-
-            interactive visuals rather than real buttons. */}
-        <View style={[styles.page, styles.pageLight, {width, height}]}>
-          <Text style={styles.title}>Download model</Text>
-          <Text style={styles.body}>Get the model and start chatting in just a few minutes.</Text>
-          {selectedModel && (
-            <View style={[styles.downloadCard, {backgroundColor: ONB.surfaceContainer, borderColor: ONB.outlineVariant}]}>
-              <Text style={styles.cardHeading}>{selectedModel.name}</Text>
-              <View style={styles.downloadFactsRow}>
-                <Text style={[styles.caption, {color: ONB.textSecondary}]}>Model size</Text>
-                <Text style={styles.caption}>{formatSize(selectedModel.sizeBytes)}</Text>
-              </View>
-              <View style={styles.downloadFactsRow}>
-                <Text style={[styles.caption, {color: ONB.textSecondary}]}>Storage needed</Text>
-                <Text style={styles.caption}>
-                  {formatSize(storageNeededBytes)}
-                  {selectedModel.mmprojSizeBytes ? ' (incl. vision files)' : ''}
-                </Text>
-              </View>
+        {/* Screen 2: Offline capability */}
+        <View style={[styles.page, {width, height}]}>
+          <View style={styles.phoneGlyph}>
+            <PalMascot size={56} color={C.accentSoft} />
+          </View>
+          <Text style={styles.eyebrow}>The idea</Text>
+          <Text style={styles.headline}>Anytime,{'\n'}Anywhere.</Text>
+          <Text style={styles.subtitle}>
+            Your pals live inside your phone. <Highlight>No internet, no signal</Highlight> -- they work on
+            planes, off-grid, in remote villages.
+          </Text>
+        </View>
 
-              <View style={styles.downloadProgressSlot}>
-                <Text style={styles.progressTitle}>Downloading... {Math.round(MOCK_PROGRESS_FRACTION * 100)}%</Text>
-                <View style={[styles.progressTrack, {backgroundColor: ONB.surfaceContainerHigh}]}>
-                  <View
-                    style={[
-                      styles.progressFillBar,
-                      {width: `${MOCK_PROGRESS_FRACTION * 100}%`, backgroundColor: ONB.accent},
-                    ]}
-                  />
-                </View>
-                <Text style={[styles.small, {color: ONB.textMuted}]}>
-                  {formatSize(mockDownloadedBytes)} / {formatSize(storageNeededBytes)} · {MOCK_ETA_LABEL}
-                </Text>
-              </View>
-
-              <View style={[styles.tipCard, {backgroundColor: ONB.accentMuted}]}>
-                <Text style={[styles.tipLine, {color: ONB.accent}]}>Keep the app open during download</Text>
-                <Text style={[styles.tipLine, {color: ONB.accent}]}>Use Wi-Fi for a faster experience</Text>
-              </View>
-
-              {/* Static mockup only -- not wrapped in any touchable. */}
-              <View style={[styles.mockPauseButton, {backgroundColor: ONB.accent}]}>
-                <Text style={styles.mockPauseLabel}>Pause</Text>
-              </View>
-              <Text style={styles.mockCancelLink}>Cancel</Text>
+        {/* Screen 3: Local vs Cloud comparison */}
+        <View style={[styles.page, {width, height}]}>
+          <View style={styles.comparisonRow}>
+            <View style={[styles.comparisonCard, styles.comparisonCardLeft]}>
+              <Text style={styles.comparisonTitle}>Your pal</Text>
+              <Text style={styles.comparisonMeta}>Lives on your phone</Text>
+              <Text style={styles.comparisonMeta}>Fast • Offline • Private</Text>
             </View>
+            <View style={[styles.comparisonCard, styles.comparisonCardRight]}>
+              <Text style={styles.comparisonTitle}>Cloud AI</Text>
+              <Text style={styles.comparisonMeta}>Lives in the cloud</Text>
+              <Text style={styles.comparisonMeta}>Bigger • Online • Tracked</Text>
+            </View>
+          </View>
+          <Text style={styles.eyebrow}>A heads-up</Text>
+          <Text style={styles.headline}>Smaller,{'\n'}but yours.</Text>
+          <Text style={styles.subtitle}>
+            Pals on your phone are <Highlight>quick and private</Highlight> -- but lighter than Cloud AI.
+            Think pocket companion, not all-knowing oracle.
+          </Text>
+        </View>
+
+        {/* Screen 4: Privacy guarantee */}
+        <View style={[styles.page, {width, height}]}>
+          <View style={styles.phoneGlyph}>
+            <PalMascot size={56} color={C.accentSoft} />
+          </View>
+          <Text style={styles.eyebrow}>Privacy promised</Text>
+          <Text style={styles.headline}>Nothing leaves{'\n'}your phone.</Text>
+          <Text style={styles.subtitle}>
+            <Highlight>No accounts. No cloud. No tracking.</Highlight> Your conversations stay yours.
+          </Text>
+        </View>
+
+        {/* Screen 5: Use-case grid */}
+        <View style={[styles.page, styles.gridPage, {width, height}]}>
+          <Text style={styles.gridTitle}>What's your pal for?</Text>
+          <Text style={styles.gridSubtitle}>
+            Pick what you'd like to discuss -- we'll match a pal that fits your phone.
+          </Text>
+          <View style={styles.grid}>
+            {ONBOARDING_USE_CASES.map(useCase => {
+              const Icon = useCase.icon;
+              const isSelected = selectedUseCase.key === useCase.key;
+              return (
+                <TouchableOpacity
+                  key={useCase.key}
+                  style={[styles.gridCell, isSelected && styles.gridCellSelected]}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    setSelectedUseCase(useCase);
+                    goToStep(STEP.reveal);
+                  }}>
+                  <Icon size={26} color={C.accentSoft} />
+                  <Text style={styles.gridCellLabel}>{useCase.label}</Text>
+                  <Text style={styles.gridCellSublabel}>{useCase.sublabel}</Text>
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity
+              style={[styles.gridCell, styles.gridCellOutline]}
+              activeOpacity={0.85}
+              onPress={skip}>
+              <Text style={styles.gridCellLabel}>Looking for something else?</Text>
+              <Text style={styles.gridCellSublabel}>Browse all pals later in the app</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Screen 6: Pal reveal + device hardware check + model tier pick */}
+        <View style={[styles.page, styles.revealPage, {width, height}]}>
+          {revealMode === 'ready' ? (
+            <>
+              <PalMascot size={88} color={selectedUseCase.mascotColor} />
+              <Text style={styles.headline}>You're all set!</Text>
+              <Text style={styles.subtitle}>
+                {selectedUseCase.palName} is ready to chat -- start your first conversation now.
+              </Text>
+            </>
+          ) : revealMode === 'downloading' ? (
+            <>
+              <PalMascot size={72} color={selectedUseCase.mascotColor} />
+              <Text style={styles.revealPalName}>{selectedUseCase.palName}</Text>
+              {selectedModel && (
+                <NeuralDownloadProgress
+                  fraction={activeQueueItem?.fraction ?? 0}
+                  status={activeQueueItem?.status ?? 'queued'}
+                  bytesWritten={activeQueueItem?.bytesWritten ?? 0}
+                  totalBytes={activeQueueItem?.totalBytes ?? selectedModel.sizeBytes}
+                  queuePosition={queuePosition}
+                  error={activeQueueItem?.error}
+                  onCancel={() => {
+                    if (selectedDescriptor) {
+                      downloadQueue.cancel(selectedDescriptor);
+                    }
+                    setRevealMode('picking');
+                  }}
+                  onRetry={() => selectedDescriptor && downloadQueue.retry(selectedDescriptor)}
+                  onPause={() => selectedDescriptor && downloadQueue.pause(selectedDescriptor)}
+                  onResume={() => selectedDescriptor && downloadQueue.resume(selectedDescriptor)}
+                />
+              )}
+            </>
+          ) : (
+            <>
+              <PalMascot size={72} color={selectedUseCase.mascotColor} />
+              <Text style={styles.revealPalName}>{selectedUseCase.palName}</Text>
+              <Text style={styles.subtitle}>{selectedUseCase.palBio}</Text>
+              {deviceLabel !== '' && (
+                <View style={styles.deviceChip}>
+                  <Text style={styles.deviceChipLabel}>{deviceLabel}</Text>
+                </View>
+              )}
+              <Text style={styles.tierIntro}>
+                {selectedUseCase.palName} thinks using a small AI model on your phone -- pick one that fits.
+              </Text>
+              <View style={styles.tierList}>
+                {modelTiers.map(row => {
+                  const isSelected = selectedModelId === row.model.id;
+                  return (
+                    <TouchableOpacity
+                      key={row.model.id}
+                      style={[
+                        styles.tierRow,
+                        isSelected && (row.recommended ? styles.tierRowRecommended : styles.tierRowSelected),
+                      ]}
+                      activeOpacity={0.85}
+                      onPress={() => setSelectedModelId(row.model.id)}>
+                      <View
+                        style={[
+                          styles.radioOuter,
+                          isSelected && {
+                            borderColor: row.recommended ? C.onAccent : C.accent,
+                          },
+                        ]}>
+                        {isSelected && (
+                          <View
+                            style={[
+                              styles.radioInner,
+                              {backgroundColor: row.recommended ? C.onAccent : C.accent},
+                            ]}
+                          />
+                        )}
+                      </View>
+                      <View style={styles.tierTextCol}>
+                        <View style={styles.tierLabelRow}>
+                          <Text
+                            style={[
+                              styles.tierLabel,
+                              {color: isSelected && row.recommended ? C.onAccent : C.textPrimary},
+                            ]}>
+                            {row.label}
+                          </Text>
+                          {row.recommended && (
+                            <View style={styles.recommendedBadge}>
+                              <Text style={styles.recommendedBadgeLabel}>Recommended</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text
+                          style={[
+                            styles.tierMeta,
+                            {color: isSelected && row.recommended ? C.onAccent : C.textSecondary},
+                          ]}>
+                          {row.model.name.replace(' Instruct', '')} • {formatSize(row.model.sizeBytes)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {revealMode === 'error' && revealError && <Text style={styles.errorText}>{revealError}</Text>}
+            </>
           )}
         </View>
-
-        {/* Slide 4: Your privacy matters -- redesigned as three distinct
-            icon/title/description feature cards instead of one shield +
-            a plain checklist, matching how most modern app onboarding
-            flows present a short list of privacy facts. */}
-        <View style={[styles.page, styles.pageLight, {width, height}]}>
-          <Text style={styles.title}>Your privacy matters</Text>
-          <Text style={styles.body}>Everything below is true the moment you finish setup -- not a promise for later.</Text>
-          <View style={styles.privacyList}>
-            {PRIVACY_FEATURES.map(feature => (
-              <View
-                key={feature.title}
-                style={[styles.privacyCard, {backgroundColor: ONB.surfaceContainer, borderColor: ONB.outlineVariant}]}>
-                <View style={[styles.privacyIconTile, {backgroundColor: feature.tint}]}>
-                  <feature.Icon size={22} color={feature.color} />
-                </View>
-                <View style={styles.privacyTextCol}>
-                  <Text style={styles.privacyCardTitle}>{feature.title}</Text>
-                  <Text style={styles.privacyCardDesc}>{feature.description}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Slide 5: You're all set -- same photo background as the welcome
-            slide, not the plain light surface every other slide uses. Logo
-            is the same static mark as the welcome slide (no spin -- this
-            closing screen shouldn't animate either), and the Zayla
-            wordmark reappears here too, matching the welcome slide. */}
-        <ImageBackground source={scenery} resizeMode="cover" style={[styles.page, styles.donePage, {width, height}]}>
-          <LogoMark size={132} />
-          <Text style={styles.heroBrand}>Zayla</Text>
-          <Text style={styles.doneTitle}>You're all set!</Text>
-          <Text style={styles.doneSubtitle}>
-            Start your first conversation and experience the power of AI on your device.
-          </Text>
-        </ImageBackground>
       </ScrollView>
 
-      {/* Floats on top of every slide -- including the welcome photo --
-          instead of sitting in its own opaque strip beneath the ScrollView,
-          so the photo (and every other slide's background) genuinely fills
-          the full screen behind it. */}
-      {step === STEP.welcome ? (
-        // Welcome-only bottom layout, per the explicit reference spec:
-        // button, then link, then a compact "N / total" counter with a
-        // short centered bar right at the bottom edge -- a different order
-        // and shape from every other slide's shared full-width bar above
-        // the footer, so it's a separate block rather than a variant of
-        // bottomOverlay/footer below.
-        <View style={styles.welcomeBottom} pointerEvents="box-none">
-          <PrimaryButton
-            label="Get Started  →"
-            onPress={() => goToStep(STEP.choose)}
-            style={styles.welcomeButton}
-            labelStyle={styles.buttonLabel}
-          />
-          <TouchableOpacity onPress={onDone} hitSlop={10} style={styles.welcomeLinkWrap}>
-            <Text style={styles.welcomeLink}>I already have a model</Text>
-          </TouchableOpacity>
-          <View style={styles.welcomeProgressWrap}>
-            <Text style={styles.welcomeProgressLabel}>
-              {step + 1} / {SLIDE_COUNT}
-            </Text>
-            <View style={styles.welcomeProgressTrack}>
-              <View style={[styles.welcomeProgressFill, {width: `${((step + 1) / SLIDE_COUNT) * 100}%`}]} />
-            </View>
-          </View>
-        </View>
-      ) : (
-        <View style={styles.bottomOverlay} pointerEvents="box-none">
-          <View style={styles.progressTrack2}>
-            <View
-              style={[styles.progressFill, {width: `${((step + 1) / SLIDE_COUNT) * 100}%`, backgroundColor: ONB.accent}]}
+      {step < STEP.useCase && (
+        <TopBar activeSegment={step} skipLabel="Skip" onSkip={skip} />
+      )}
+      {step === STEP.useCase && <TopBar activeSegment={null} skipLabel="Skip" onSkip={skip} />}
+      {step === STEP.reveal && revealMode === 'picking' && (
+        <TopBar activeSegment={null} skipLabel="Skip for now" onSkip={skip} />
+      )}
+
+      {step < STEP.useCase && (
+        <View style={styles.footer} pointerEvents="box-none">
+          {step > STEP.welcome && <BackCircleButton onPress={() => goToStep(step - 1)} />}
+          <View style={styles.footerButtonSlot}>
+            <PillButton
+              label={
+                step === STEP.welcome
+                  ? 'Show me Around'
+                  : step === STEP.offline
+                  ? 'Next'
+                  : step === STEP.comparison
+                  ? 'Got it'
+                  : 'Get Started'
+              }
+              onPress={() => goToStep(step + 1)}
             />
           </View>
-
-          <View style={styles.footer}>
-            {step === STEP.done ? (
-              <>
-                <PrimaryButton label="Start Chatting  →" onPress={onDone} labelStyle={styles.buttonLabel} />
-                <TouchableOpacity onPress={finishToSettings} hitSlop={10} style={styles.centerLink}>
-                  <Text style={[styles.linkLabel, {color: ONB.accent}]}>Explore Settings</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <View style={styles.linksRow}>
-                <TouchableOpacity onPress={onDone} hitSlop={10}>
-                  <Text style={[styles.linkLabel, {color: ONB.textMuted}]}>Skip</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => goToStep(step + 1)}
-                  hitSlop={10}
-                  style={[styles.arrowButton, {backgroundColor: ONB.accent}]}>
-                  <ArrowRight size={20} color={ONB.onAccent} />
-                </TouchableOpacity>
-              </View>
-            )}
+        </View>
+      )}
+      {step === STEP.reveal && revealMode === 'picking' && (
+        <View style={styles.footer} pointerEvents="box-none">
+          <BackCircleButton onPress={() => goToStep(STEP.useCase)} />
+          <View style={styles.footerButtonSlot}>
+            <PillButton
+              label={
+                selectedModel
+                  ? `⬇  Download ${selectedUseCase.palName} (${formatSize(selectedModel.sizeBytes)})`
+                  : `⬇  Download ${selectedUseCase.palName}`
+              }
+              onPress={startDownload}
+              disabled={!selectedModel}
+            />
+          </View>
+        </View>
+      )}
+      {step === STEP.reveal && revealMode === 'ready' && (
+        <View style={styles.footer} pointerEvents="box-none">
+          <View style={styles.footerButtonSlot}>
+            <PillButton label="Start Chatting  →" onPress={finishAndEnter} />
           </View>
         </View>
       )}
@@ -464,187 +604,175 @@ export function OnboardingScreen({onDone}: {onDone: () => void}) {
 const styles = StyleSheet.create({
   container: {flex: 1},
   scroll: {flex: 1},
-  // No height here -- each page passes an explicit {height} (from
-  // useWindowDimensions, alongside {width}) inline instead of `100%`.
-  // A horizontal ScrollView's row-direction content container doesn't
-  // reliably resolve a percentage height down to children on this RN
-  // version (confirmed live: ImageBackground's absolute-fill photo fell
-  // short of the true bottom, leaving a plain white gap), so this uses a
-  // concrete pixel value instead of relying on that resolution at all.
-  page: {alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32},
-  // Top-anchored now (matches the reference layout): logo + brand + heading
-  // + subtitle cluster together just below the status bar, leaving the
-  // photo's scenic lower half open behind the Get Started button/link that
-  // bottomOverlay floats on top of. No scrim -- the reference shows dark
-  // text sitting directly on the photo's own light sky, not white text on
-  // a darkened photo.
-  heroPage: {justifyContent: 'flex-start', paddingTop: 64, paddingBottom: FOOTER_RESERVE},
-  heroTop: {alignItems: 'center', paddingHorizontal: 32},
-  heroGradient: {position: 'absolute', top: 0, left: 0, right: 0},
-  pageLight: {paddingTop: 60, paddingBottom: FOOTER_RESERVE, justifyContent: 'flex-start', alignItems: 'stretch'},
-  donePage: {justifyContent: 'center', alignItems: 'center', paddingTop: 0},
-  heroBrand: {
-    fontFamily: FONT.brand,
-    color: NAVY,
-    fontSize: 38,
+  page: {alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingTop: 90, paddingBottom: 140},
+  eyebrow: {color: C.textMuted, fontSize: 14, marginTop: 20, textAlign: 'center'},
+  headline: {
+    fontFamily: SERIF,
+    fontStyle: 'italic',
+    color: C.textPrimary,
+    fontSize: 40,
+    lineHeight: 46,
     textAlign: 'center',
     marginTop: 14,
   },
-  heroHeading: {
-    fontFamily: FONT.heading,
-    color: NAVY,
-    fontSize: 43,
-    lineHeight: 45,
+  subtitle: {
+    color: C.textSecondary,
+    fontSize: 16,
+    lineHeight: 23,
     textAlign: 'center',
-    marginTop: 34,
+    marginTop: 22,
   },
-  heroSubtitle: {
-    fontFamily: FONT.medium,
-    color: NAVY_MUTED,
-    fontSize: 18,
+  highlight: {
+    color: C.onAccent,
+    backgroundColor: C.accent,
+    fontWeight: '600',
+  },
+  phoneGlyph: {
+    width: 96,
+    height: 96,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  comparisonRow: {flexDirection: 'row', marginBottom: 40, gap: -12},
+  comparisonCard: {
+    width: 140,
+    height: 150,
+    borderRadius: 20,
+    backgroundColor: C.white,
+    padding: 16,
+    justifyContent: 'flex-end',
+  },
+  comparisonCardLeft: {transform: [{rotate: '-6deg'}]},
+  comparisonCardRight: {transform: [{rotate: '6deg'}], marginLeft: -24, opacity: 0.9},
+  comparisonTitle: {color: C.black, fontWeight: '700', fontSize: 15, marginBottom: 4},
+  comparisonMeta: {color: '#5B5B5B', fontSize: 11, lineHeight: 15},
+  gridPage: {justifyContent: 'flex-start', paddingTop: 100, paddingBottom: 32},
+  gridTitle: {
+    fontFamily: SERIF,
+    fontStyle: 'italic',
+    color: C.textPrimary,
+    fontSize: 28,
     textAlign: 'center',
-    marginTop: 20,
-    lineHeight: 25,
   },
-  doneTitle: {
-    fontFamily: FONT.heading,
-    color: ONB.textPrimary,
-    fontSize: 24,
-    textAlign: 'center',
-    marginTop: spacing.lg,
+  gridSubtitle: {color: C.textSecondary, fontSize: 14, textAlign: 'center', marginTop: 10, lineHeight: 20},
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: 28,
+    gap: 12,
   },
-  doneSubtitle: {
-    fontFamily: FONT.body,
-    color: ONB.textSecondary,
-    fontSize: 15,
-    textAlign: 'center',
-    marginTop: spacing.sm,
-    lineHeight: 21,
-    paddingHorizontal: spacing.lg,
+  gridCell: {
+    width: '48%',
+    borderRadius: 20,
+    backgroundColor: C.card,
+    borderWidth: 1,
+    borderColor: C.cardBorder,
+    padding: 16,
+    gap: 4,
+    minHeight: 108,
   },
-  title: {
-    fontFamily: FONT.heading,
-    color: ONB.textPrimary,
-    fontSize: 24,
-    textAlign: 'center',
-    marginBottom: 12,
+  gridCellSelected: {borderColor: C.accent},
+  gridCellOutline: {width: '100%', backgroundColor: 'transparent', borderStyle: 'dashed'},
+  gridCellLabel: {color: C.textPrimary, fontWeight: '700', fontSize: 15, marginTop: 6},
+  gridCellSublabel: {color: C.textMuted, fontSize: 12, lineHeight: 16},
+  revealPage: {paddingTop: 70, paddingBottom: 140},
+  revealPalName: {
+    fontFamily: SERIF,
+    fontStyle: 'italic',
+    color: C.textPrimary,
+    fontSize: 34,
+    marginTop: 14,
   },
-  body: {
-    fontFamily: FONT.body,
-    color: ONB.textSecondary,
-    fontSize: 15,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: spacing.lg,
+  deviceChip: {
+    backgroundColor: C.cardHigh,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginTop: 18,
   },
-  cardHeading: {fontFamily: FONT.semiBold, color: ONB.textPrimary, fontSize: 17},
-  caption: {fontFamily: FONT.medium, color: ONB.textPrimary, fontSize: 13},
-  small: {fontFamily: FONT.medium, fontSize: 11},
-  modelList: {flex: 1},
-  modelListContent: {paddingBottom: spacing.lg},
-  hfCard: {
+  deviceChipLabel: {color: C.textSecondary, fontSize: 12},
+  tierIntro: {color: C.textSecondary, fontSize: 14, textAlign: 'center', marginTop: 22, lineHeight: 20},
+  tierList: {width: '100%', marginTop: 18, gap: 10},
+  tierRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    borderRadius: radius.lg,
+    gap: 12,
+    borderRadius: 18,
     borderWidth: 1,
-    padding: spacing.md,
-    marginTop: spacing.xs,
+    borderColor: 'transparent',
+    backgroundColor: C.card,
+    padding: 16,
   },
-  hfIconTile: {
-    width: 40,
-    height: 40,
-    borderRadius: 13,
+  tierRowSelected: {borderColor: C.accent},
+  tierRowRecommended: {backgroundColor: C.accentSoft, borderColor: C.accentSoft},
+  radioOuter: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  hfTextCol: {flex: 1, gap: 2},
-  hfTitle: {fontFamily: FONT.semiBold, color: ONB.textPrimary, fontSize: 15},
-  hfDesc: {fontFamily: FONT.body, color: ONB.textSecondary, fontSize: 12, lineHeight: 16},
-  downloadCard: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    padding: spacing.md,
-    gap: spacing.xs,
+  radioInner: {width: 10, height: 10, borderRadius: 5},
+  tierTextCol: {flex: 1, gap: 2},
+  tierLabelRow: {flexDirection: 'row', alignItems: 'center', gap: 8},
+  tierLabel: {fontSize: 16, fontWeight: '700'},
+  tierMeta: {fontSize: 12},
+  recommendedBadge: {
+    backgroundColor: C.onAccent,
+    borderRadius: 999,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
   },
-  downloadFactsRow: {flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2},
-  downloadProgressSlot: {marginTop: spacing.md, marginBottom: spacing.sm, gap: 6},
-  progressTitle: {fontFamily: FONT.semiBold, color: ONB.textPrimary, fontSize: 15},
-  progressTrack: {height: 6, borderRadius: radius.pill, overflow: 'hidden'},
-  progressFillBar: {height: '100%', borderRadius: radius.pill},
-  tipCard: {borderRadius: radius.md, padding: spacing.sm, gap: 4},
-  tipLine: {fontFamily: FONT.semiBold, fontSize: 11},
-  mockPauseButton: {
-    marginTop: spacing.sm,
-    paddingVertical: 12,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mockPauseLabel: {fontFamily: FONT.semiBold, color: ONB.onAccent, fontSize: 15},
-  mockCancelLink: {
-    fontFamily: FONT.medium,
-    color: ONB.textMuted,
-    fontSize: 15,
-    textAlign: 'center',
-    paddingTop: spacing.sm,
-  },
-  privacyList: {width: '100%', gap: spacing.sm},
-  privacyCard: {
+  recommendedBadgeLabel: {color: C.accentSoft, fontSize: 10, fontWeight: '700'},
+  errorText: {color: '#F65C5C', fontSize: 13, textAlign: 'center', marginTop: 14},
+  topBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    padding: spacing.md,
-  },
-  privacyIconTile: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingTop: 56,
   },
-  privacyTextCol: {flex: 1, gap: 2},
-  privacyCardTitle: {fontFamily: FONT.semiBold, color: ONB.textPrimary, fontSize: 15},
-  privacyCardDesc: {fontFamily: FONT.body, color: ONB.textSecondary, fontSize: 13, lineHeight: 18},
-  bottomOverlay: {position: 'absolute', left: 0, right: 0, bottom: 0},
-  // Welcome-only bottom layout (see JSX comment): button, link, then a
-  // compact centered "N / total" counter + short bar right at the bottom
-  // edge -- a different shape/order from the shared bottomOverlay/footer
-  // every other slide uses, per the reference spec.
-  welcomeBottom: {position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 28, paddingBottom: 16},
-  welcomeButton: {borderRadius: radius.pill, paddingVertical: 15},
-  welcomeLinkWrap: {alignItems: 'center', paddingTop: 22},
-  welcomeLink: {fontFamily: FONT.semiBold, color: ONB.accent, fontSize: 15},
-  welcomeProgressWrap: {alignItems: 'center', marginTop: 22},
-  welcomeProgressLabel: {fontFamily: FONT.medium, color: NAVY_MUTED, fontSize: 12, marginBottom: 6},
-  welcomeProgressTrack: {
-    width: 90,
-    height: 4,
-    borderRadius: radius.pill,
-    backgroundColor: 'rgba(16,41,74,0.15)',
-    overflow: 'hidden',
+  topBarProgressSlot: {flex: 1, marginRight: 16},
+  skipLabel: {color: C.textSecondary, fontSize: 14, fontWeight: '600'},
+  segmentRow: {flexDirection: 'row', gap: 6},
+  segment: {flex: 1, height: 4, borderRadius: 999},
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 24,
+    paddingBottom: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
   },
-  welcomeProgressFill: {height: '100%', borderRadius: radius.pill, backgroundColor: ONB.accent},
-  progressTrack2: {
-    height: 3,
-    marginHorizontal: 32,
-    borderRadius: radius.pill,
-    backgroundColor: 'rgba(128,128,128,0.25)',
-    overflow: 'hidden',
-  },
-  progressFill: {height: '100%', borderRadius: radius.pill},
-  footer: {paddingHorizontal: 24, paddingTop: spacing.md, paddingBottom: 24, gap: spacing.sm},
-  buttonLabel: {fontFamily: FONT.semiBold},
-  linkLabel: {fontFamily: FONT.medium, fontSize: 15},
-  centerLink: {alignItems: 'center', paddingTop: spacing.xs},
-  linksRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
-  arrowButton: {
+  footerButtonSlot: {flex: 1},
+  backCircle: {
     width: 48,
     height: 48,
     borderRadius: 24,
+    backgroundColor: C.cardHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  pillButton: {
+    height: 56,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  pillButtonLabel: {fontSize: 16, fontWeight: '700'},
 });
