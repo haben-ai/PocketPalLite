@@ -3,21 +3,21 @@
 // dark text, accent stays a plain black/white inversion (no brand color).
 export const lightColors = {
   background: '#FFFFFF',
-  sidebarBackground: '#F4F8FF',
+  sidebarBackground: '#FEF8F3',
 
-  // Whitish-blue surface scale (explicitly requested) -- replaces the
-  // earlier neutral-gray card tones with a soft blue tint, still light
+  // Whitish-orange surface scale -- matches the app icon's brand family
+  // (was a whitish-blue tint before the orange rebrand), still light
   // enough to read as "off-white" rather than a colored panel.
-  surfaceContainerLow: '#F4F8FF',
-  surfaceContainer: '#EAF2FF',
-  surfaceContainerHigh: '#DCE9FC',
-  surfaceContainerHighest: '#CFE0FA',
-  surface: '#EAF2FF',
-  surfaceRaised: '#DCE9FC',
+  surfaceContainerLow: '#FEF8F3',
+  surfaceContainer: '#FDF2EA',
+  surfaceContainerHigh: '#FAE8DB',
+  surfaceContainerHighest: '#F6DECD',
+  surface: '#FDF2EA',
+  surfaceRaised: '#FAE8DB',
 
-  outline: '#C9DCF5',
-  outlineVariant: '#DCE9FC',
-  border: '#C9DCF5',
+  outline: '#EBD0BC',
+  outlineVariant: '#FAE8DB',
+  border: '#EBD0BC',
 
   // Pure black, not a near-black gray -- explicitly requested for light
   // mode's body text (the near-black #1A1A1A this used to be is why light
@@ -26,10 +26,10 @@ export const lightColors = {
   textSecondary: '#5A5A5F',
   textMuted: '#8E8E93',
 
-  // Brand blue -- explicit hex (#0081FB) requested by name, replacing the
-  // earlier red rebrand.
-  accent: '#0081FB',
-  accentMuted: '#0081FB1F',
+  // Brand orange -- derived from the app icon's gradient mark, lightened
+  // for use as a UI accent (the icon's own orange is closer to #F97300).
+  accent: '#F7863B',
+  accentMuted: '#F7863B1F',
   onAccent: '#FFFFFF',
 
   userBubble: '#EDEDEF',

@@ -22,10 +22,10 @@ export const darkColors = {
   textSecondary: '#B4B4B4',
   textMuted: '#8E8EA0',
 
-  // Brand blue -- explicit hex (#0081FB) requested by name, replacing the
-  // earlier red rebrand.
-  accent: '#0081FB',
-  accentMuted: '#0081FB26',
+  // Brand orange -- derived from the app icon's gradient mark, lightened
+  // for use as a UI accent (the icon's own orange is closer to #F97300).
+  accent: '#F7863B',
+  accentMuted: '#F7863B26',
   onAccent: '#FFFFFF',
 
   userBubble: '#2F2F2F',
