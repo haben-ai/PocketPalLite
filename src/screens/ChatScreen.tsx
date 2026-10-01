@@ -743,9 +743,18 @@ export function ChatScreen({
         onImported={onConversationImported}
       />
 
+      {/* 'height' on Android, not the previous `undefined` -- that left
+          keyboard avoidance entirely up to the native window resizing from
+          AndroidManifest's windowSoftInputMode="adjustResize", which some
+          devices (seen on gesture-nav/edge-to-edge setups) silently don't
+          honor, leaving the composer hidden behind the keyboard right when
+          autoFocus pops it open on a fresh chat. 'height' reacts to the
+          real Keyboard show/hide events instead of trusting the OS resize,
+          so it corrects the gap on exactly those devices without changing
+          behavior where native resize already worked. */}
       <KeyboardAvoidingView
         style={{flex: 1}}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {ready ? (
           <FlatList
             ref={listRef}
