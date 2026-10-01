@@ -3,7 +3,6 @@ import {
   AppState,
   FlatList,
   KeyboardAvoidingView,
-  Platform,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -755,18 +754,22 @@ export function ChatScreen({
         onImported={onConversationImported}
       />
 
-      {/* 'height' on Android, not the previous `undefined` -- that left
+      {/* 'padding' on Android too, not the previous `undefined` -- that left
           keyboard avoidance entirely up to the native window resizing from
           AndroidManifest's windowSoftInputMode="adjustResize", which some
           devices (seen on gesture-nav/edge-to-edge setups) silently don't
-          honor, leaving the composer hidden behind the keyboard right when
-          autoFocus pops it open on a fresh chat. 'height' reacts to the
-          real Keyboard show/hide events instead of trusting the OS resize,
-          so it corrects the gap on exactly those devices without changing
-          behavior where native resize already worked. */}
-      <KeyboardAvoidingView
-        style={{flex: 1}}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          honor, leaving the composer hidden behind the keyboard. An earlier
+          attempt used 'height' here, but that mode sets an explicit height
+          on keyboardDidShow and only actually reflows this view's children
+          (shrinking the FlatList, pushing the composer up) on the *next*
+          render after that -- for a frame or more, the composer still sits
+          at its pre-keyboard position, visibly behind it, until something
+          else (e.g. the user typing) forces a re-render. 'padding' instead
+          animates paddingBottom in lockstep with the real keyboard
+          show/hide animation (duration and easing included), which is also
+          what already works correctly on iOS above -- no separate Android
+          codepath needed. */}
+      <KeyboardAvoidingView style={{flex: 1}} behavior="padding">
         {ready ? (
           <FlatList
             ref={listRef}
