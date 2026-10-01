@@ -16,11 +16,8 @@ import {motion, radius, spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
 import {Conversation, DownloadedModel} from '../types';
 import {getModelById} from '../data/models';
-import {
-  createConversation,
-  deleteConversation,
-  getConversations,
-} from '../storage/conversations';
+import {deleteConversation, getConversations} from '../storage/conversations';
+import {BUILT_IN_PERSONA_ID} from '../data/persona';
 import {getDownloadedModels} from '../storage/modelRegistry';
 import {CapabilityBadge} from './Badge';
 import {ModelPickerList} from './ModelPickerList';
@@ -87,11 +84,16 @@ export function ConversationDrawer({
   visible,
   onClose,
   onOpenConversation,
+  onNewChat,
   onNavigate,
 }: {
   visible: boolean;
   onClose: () => void;
   onOpenConversation: (modelId: string, conversationId: string) => void;
+  /** Starts a genuinely new conversation (creates it and auto-focuses the
+   * composer) -- distinct from onOpenConversation, which resumes an
+   * existing one and deliberately does not pop the keyboard. */
+  onNewChat: (modelId: string, personaId: string) => void;
   onNavigate: (screen: AppScreen) => void;
 }) {
   const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
@@ -150,9 +152,10 @@ export function ConversationDrawer({
     ]).start();
   }, [visible, refresh, translateX, backdropOpacity]);
 
-  const handleStartNewChat = async (modelId: string) => {
-    const conversation = await createConversation(modelId);
-    onOpenConversation(modelId, conversation.id);
+  const handleStartNewChat = (modelId: string) => {
+    setShowModelPicker(false);
+    onClose();
+    onNewChat(modelId, BUILT_IN_PERSONA_ID);
   };
 
   const handleDelete = (conversation: Conversation) => {

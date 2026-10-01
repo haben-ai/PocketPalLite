@@ -227,9 +227,21 @@ export function ChatScreen({
   // not before, since it's `editable={false}` and disabled-looking while
   // the model is still loading. autoFocus is false for resuming a specific
   // past conversation (reopening it to read isn't an intent to type).
+  //
+  // The short delay is deliberate: `key={conversationId}` (ChatTabScreen)
+  // fully remounts this screen for a new chat, so the composer's TextInput
+  // is a brand-new native view -- and for an already-loaded model, `ready`
+  // flips true in the same tick the view mounts. Calling .focus() on an
+  // Android TextInput that synchronously, before its first frame has
+  // actually committed, is a known case where the native view accepts
+  // logical focus but never tells the IME to show the keyboard: nothing
+  // visibly happens, and without a keyboard up, there's nothing to type
+  // into until the user manually taps the field. Deferring one tick (past
+  // the commit) is the standard fix for that race.
   useEffect(() => {
     if (ready && autoFocus) {
-      composerRef.current?.focus();
+      const timer = setTimeout(() => composerRef.current?.focus(), 50);
+      return () => clearTimeout(timer);
     }
   }, [ready, autoFocus]);
 

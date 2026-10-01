@@ -179,6 +179,7 @@ export function ChatTabScreen({
           visible={drawerOpen}
           onClose={() => setDrawerOpen(false)}
           onOpenConversation={handleOpenConversation}
+          onNewChat={handleNewChat}
           onNavigate={onNavigate}
         />
       </AIPalScaffold>
@@ -202,6 +203,7 @@ export function ChatTabScreen({
         visible={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onOpenConversation={handleOpenConversation}
+        onNewChat={handleNewChat}
         onNavigate={onNavigate}
       />
     </>
