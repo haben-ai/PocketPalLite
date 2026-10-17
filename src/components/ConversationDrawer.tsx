@@ -74,11 +74,11 @@ const APP_SECTION_ITEMS: {icon: (color: string) => React.ReactNode; label: strin
 ];
 
 /**
- * Conversation history sidebar: New chat fixed at top, a scrollable
- * conversation list, then an "App" section for every other destination
- * (Chat/Models/AIPals/Discover/Benchmark/Settings/App Info) -- this used to
- * live in a separate bottom tab bar, removed because it overlapped the
- * system nav bar on some Android devices.
+ * Conversation history sidebar: New chat fixed at top, then an "App"
+ * section for every other destination (Chat/Models/AIPals/Discover/
+ * Benchmark/Settings/App Info), then the scrollable conversation history
+ * below it. The destinations used to live in a separate bottom tab bar,
+ * removed because it overlapped the system nav bar on some Android devices.
  */
 export function ConversationDrawer({
   visible,
@@ -215,13 +215,32 @@ export function ConversationDrawer({
           </TouchableOpacity>
         )}
 
-        <Text style={[typography.small, styles.sectionLabel, {color: colors.textMuted}]}>
-          {t('drawer.chats')}
-        </Text>
         <FlatList
           data={conversations}
           keyExtractor={item => item.id}
           style={styles.list}
+          ListHeaderComponent={
+            <View>
+              <Text style={[typography.small, styles.sectionLabel, {color: colors.textMuted}]}>
+                App
+              </Text>
+              {APP_SECTION_ITEMS.map(item => (
+                <TouchableOpacity
+                  key={item.label}
+                  style={styles.menuRow}
+                  onPress={() => {
+                    onClose();
+                    onNavigate(item.screen);
+                  }}>
+                  {item.icon(colors.textPrimary)}
+                  <Text style={typography.body}>{item.label}</Text>
+                </TouchableOpacity>
+              ))}
+              <Text style={[typography.small, styles.sectionLabel, {color: colors.textMuted}]}>
+                {t('drawer.chats')}
+              </Text>
+            </View>
+          }
           ListEmptyComponent={
             <Text style={[typography.caption, styles.emptyHint]}>{t('drawer.noConversations')}</Text>
           }
@@ -249,25 +268,6 @@ export function ConversationDrawer({
               </TouchableOpacity>
             );
           }}
-          ListFooterComponent={
-            <View>
-              <Text style={[typography.small, styles.sectionLabel, {color: colors.textMuted}]}>
-                App
-              </Text>
-              {APP_SECTION_ITEMS.map(item => (
-                <TouchableOpacity
-                  key={item.label}
-                  style={styles.menuRow}
-                  onPress={() => {
-                    onClose();
-                    onNavigate(item.screen);
-                  }}>
-                  {item.icon(colors.textPrimary)}
-                  <Text style={typography.body}>{item.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          }
         />
       </Animated.View>
     </View>

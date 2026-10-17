@@ -34,7 +34,7 @@ export const ONBOARDING_USE_CASES: OnboardingUseCase[] = [
     icon: MessageCircle,
     label: 'Smart Chat',
     sublabel: 'Friendly everyday companion',
-    mascotColor: '#F4B886',
+    mascotColor: '#FFAB5E',
     palName: 'Pip',
     palTagline: 'a friendly everyday companion',
     palBio:
@@ -48,7 +48,7 @@ export const ONBOARDING_USE_CASES: OnboardingUseCase[] = [
     icon: Code,
     label: 'Coding',
     sublabel: 'Code, debug, explain',
-    mascotColor: '#E8A87C',
+    mascotColor: '#FF9340',
     palName: 'Byte',
     palTagline: 'a sharp coding sidekick',
     palBio:
@@ -62,7 +62,7 @@ export const ONBOARDING_USE_CASES: OnboardingUseCase[] = [
     icon: GraduationCap,
     label: 'Education',
     sublabel: 'Learn, explain, quiz',
-    mascotColor: '#EFC08C',
+    mascotColor: '#FFB870',
     palName: 'Sage',
     palTagline: 'a patient study partner',
     palBio:
@@ -76,7 +76,7 @@ export const ONBOARDING_USE_CASES: OnboardingUseCase[] = [
     icon: Drama,
     label: 'Roleplay',
     sublabel: 'Characters, scenarios',
-    mascotColor: '#DDA15E',
+    mascotColor: '#FF8A2B',
     palName: 'Echo',
     palTagline: 'an imaginative scene partner',
     palBio:
@@ -90,7 +90,7 @@ export const ONBOARDING_USE_CASES: OnboardingUseCase[] = [
     icon: PenLine,
     label: 'Creative Writing',
     sublabel: 'Stories, ideas, drafts',
-    mascotColor: '#F0B27A',
+    mascotColor: '#FFA24D',
     palName: 'Quill',
     palTagline: 'a creative writing partner',
     palBio:

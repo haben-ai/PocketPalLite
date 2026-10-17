@@ -11,6 +11,7 @@ import {initDownloadQueue} from './src/services/downloadQueue';
 import {analyzeDevice, getStoredDeviceTier, setStoredDeviceTier} from './src/services/deviceAnalyzer';
 import {ThemeProvider} from './src/theme/ThemeContext';
 import {initI18n} from './src/i18n';
+import {registerAppOpen} from './src/services/appRating';
 
 type Route = {screen: 'loading'} | {screen: 'onboarding'} | {screen: 'app'};
 
@@ -36,6 +37,9 @@ export default function App() {
       initDownloadQueue().catch(() => undefined);
       const settings = await getAppSettings();
       initI18n(settings.language);
+      // Counted before the route is set so RatingPrompt (mounted inside
+      // RootNavigator) always reads this launch's own number.
+      await registerAppOpen().catch(() => undefined);
       const seen = await hasSeenOnboarding();
       // Restores the screen/chat the user was last on, so a cold start
       // after Android kills the backgrounded process (rather than a normal

@@ -12,6 +12,8 @@ const KEYS = {
   downloadQueue: 'pocketpal:download_queue',
   deviceTier: 'pocketpal:device_tier',
   lastScreen: 'pocketpal:last_screen',
+  appLaunchCount: 'pocketpal:app_launch_count',
+  ratingPrompt: 'pocketpal:rating_prompt',
 };
 
 export {KEYS};

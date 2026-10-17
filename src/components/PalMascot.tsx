@@ -12,7 +12,7 @@ import Svg, {Rect, Circle, Path} from 'react-native-svg';
  */
 export function PalMascot({
   size = 80,
-  color = '#F4B886',
+  color = '#FFAB5E',
   faceColor = '#2B2B2B',
 }: {
   size?: number;

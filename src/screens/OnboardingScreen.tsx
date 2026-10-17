@@ -16,6 +16,7 @@ import {
 import {ArrowLeft} from 'lucide-react-native';
 import DeviceInfo from 'react-native-device-info';
 import {PalMascot} from '../components/PalMascot';
+import {ChatGPTMark} from '../components/ChatGPTMark';
 import {NeuralDownloadProgress} from '../components/NeuralDownloadProgress';
 import {formatSize} from '../components/ModelCard';
 import {ONBOARDING_USE_CASES, OnboardingUseCase} from '../data/onboardingPals';
@@ -41,8 +42,8 @@ const C = {
   card: '#16161E',
   cardBorder: '#2A2A36',
   cardHigh: '#1E1E27',
-  accent: '#E8A87C',
-  accentSoft: '#F4B886',
+  accent: '#FF9340',
+  accentSoft: '#FFAB5E',
   onAccent: '#1A1206',
   textPrimary: '#F5F1EC',
   textSecondary: '#B7B3AE',
@@ -373,21 +374,33 @@ export function OnboardingScreen({onDone}: {onDone: () => void}) {
         {/* Screen 3: Local vs Cloud comparison */}
         <View style={[styles.page, {width, height}]}>
           <View style={styles.comparisonRow}>
-            <View style={[styles.comparisonCard, styles.comparisonCardLeft]}>
-              <Text style={styles.comparisonTitle}>Your pal</Text>
-              <Text style={styles.comparisonMeta}>Lives on your phone</Text>
-              <Text style={styles.comparisonMeta}>Fast • Offline • Private</Text>
+            <View style={[styles.comparisonCard, styles.comparisonCardZayla]}>
+              <Image source={logoTransparent} resizeMode="contain" style={styles.comparisonIcon} />
+              <Text style={styles.comparisonTitle}>Zayla</Text>
+              <Text style={styles.comparisonWhere}>Lives on your phone</Text>
+              {['Fast', 'Offline', 'Private'].map(trait => (
+                <View key={trait} style={styles.comparisonTraitRow}>
+                  <View style={[styles.comparisonDot, {backgroundColor: C.accent}]} />
+                  <Text style={styles.comparisonTrait}>{trait}</Text>
+                </View>
+              ))}
             </View>
-            <View style={[styles.comparisonCard, styles.comparisonCardRight]}>
-              <Text style={styles.comparisonTitle}>Cloud AI</Text>
-              <Text style={styles.comparisonMeta}>Lives in the cloud</Text>
-              <Text style={styles.comparisonMeta}>Bigger • Online • Tracked</Text>
+            <View style={styles.comparisonCard}>
+              <ChatGPTMark size={44} />
+              <Text style={styles.comparisonTitle}>ChatGPT</Text>
+              <Text style={styles.comparisonWhere}>Lives in the cloud</Text>
+              {['Bigger', 'Online', 'Tracked'].map(trait => (
+                <View key={trait} style={styles.comparisonTraitRow}>
+                  <View style={[styles.comparisonDot, {backgroundColor: C.textMuted}]} />
+                  <Text style={styles.comparisonTrait}>{trait}</Text>
+                </View>
+              ))}
             </View>
           </View>
           <Text style={styles.eyebrow}>A heads-up</Text>
           <Text style={styles.headline}>Smaller,{'\n'}but yours.</Text>
           <Text style={styles.subtitle}>
-            Pals on your phone are <Highlight>quick and private</Highlight> -- but lighter than Cloud AI.
+            Pals on your phone are <Highlight>quick and private</Highlight> -- but lighter than ChatGPT.
             Think pocket companion, not all-knowing oracle.
           </Text>
         </View>
@@ -637,19 +650,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
   },
-  comparisonRow: {flexDirection: 'row', marginBottom: 40, gap: -12},
+  comparisonRow: {flexDirection: 'row', alignSelf: 'stretch', gap: 12, marginBottom: 36},
   comparisonCard: {
-    width: 140,
-    height: 150,
+    flex: 1,
     borderRadius: 20,
-    backgroundColor: C.white,
+    backgroundColor: C.card,
+    borderWidth: 1,
+    borderColor: C.cardBorder,
     padding: 16,
-    justifyContent: 'flex-end',
   },
-  comparisonCardLeft: {transform: [{rotate: '-6deg'}]},
-  comparisonCardRight: {transform: [{rotate: '6deg'}], marginLeft: -24, opacity: 0.9},
-  comparisonTitle: {color: C.black, fontWeight: '700', fontSize: 15, marginBottom: 4},
-  comparisonMeta: {color: '#5B5B5B', fontSize: 11, lineHeight: 15},
+  comparisonCardZayla: {borderColor: C.accent},
+  comparisonIcon: {width: 44, height: 44, marginBottom: 12},
+  comparisonTitle: {color: C.textPrimary, fontWeight: '700', fontSize: 17},
+  comparisonWhere: {color: C.textMuted, fontSize: 12, marginTop: 2, marginBottom: 14},
+  comparisonTraitRow: {flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3},
+  comparisonDot: {width: 6, height: 6, borderRadius: 3},
+  comparisonTrait: {color: C.textSecondary, fontSize: 13},
   gridPage: {justifyContent: 'flex-start', paddingTop: 100, paddingBottom: 32},
   gridTitle: {
     fontFamily: SERIF,

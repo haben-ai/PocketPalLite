@@ -12,6 +12,7 @@ import {BenchmarkScreen} from '../screens/BenchmarkScreen';
 import {AppInfoScreen} from '../screens/AppInfoScreen';
 import {OpenSourceLicensesScreen} from '../screens/OpenSourceLicensesScreen';
 import {DialogHost} from '../components/AppDialog';
+import {RatingPrompt} from '../components/RatingPrompt';
 
 /**
  * Whichever screen is current fills the whole area -- no persistent bottom
@@ -101,6 +102,7 @@ export function RootNavigator({initialScreen}: {initialScreen?: AppScreen}) {
           call anywhere in the app (imported from AppDialog instead of
           react-native) renders through this single host. */}
       <DialogHost />
+      <RatingPrompt />
     </View>
   );
 }

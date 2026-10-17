@@ -3,6 +3,10 @@ import {Animated, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {Alert} from './AppDialog';
 import {radius, spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
+
+// Deliberately lighter than the theme accent (colors.accent) -- only the
+// per-model Download pill uses it, not the rest of the app's orange.
+const DOWNLOAD_BUTTON_ORANGE = '#FFA766';
 import {DeviceTier, DownloadedModel, ModelCapability, ModelTier, ModelVendor} from '../types';
 import {getModelCompatibility, estimatePerformance} from '../services/deviceAnalyzer';
 import {Card} from './Card';
@@ -230,7 +234,8 @@ export function ModelCard({
               label="Download"
               onPress={onDownload}
               disabled={storageLow}
-              style={styles.downloadPill}
+              style={{...styles.downloadPill, backgroundColor: DOWNLOAD_BUTTON_ORANGE}}
+              labelStyle={{color: '#2A1304'}}
             />
             {onHide && (
               <TouchableOpacity onPress={onHide} hitSlop={8} style={styles.hideButton}>
