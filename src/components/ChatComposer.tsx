@@ -1,6 +1,7 @@
 import React from 'react';
-import {Image, StyleSheet, Text, TextInput, TouchableOpacity, View} from 'react-native';
-import {ArrowUp, Image as ImageIcon} from 'lucide-react-native';
+import {ActivityIndicator, Image, StyleSheet, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {ArrowUp, Image as ImageIcon, Mic, Square} from 'lucide-react-native';
+import type {VoiceState} from '../hooks/useVoiceInput';
 import {useTranslation} from 'react-i18next';
 import {radius, spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
@@ -27,6 +28,10 @@ export const ChatComposer = React.forwardRef<
     isVisionModel: boolean;
     editingLabel?: string | null;
     onCancelEdit?: () => void;
+    /** Tap-to-talk mic; omit to hide the button. */
+    onMicPress?: () => void;
+    voiceState?: VoiceState;
+    voiceProgress?: number;
   }
 >(function ChatComposer(
   {
@@ -42,10 +47,23 @@ export const ChatComposer = React.forwardRef<
     isVisionModel,
     editingLabel,
     onCancelEdit,
+    onMicPress,
+    voiceState = 'idle',
+    voiceProgress = 0,
   },
   ref,
 ) {
   const canSend = ready && !isGenerating && (!!value.trim() || !!pendingImagePath);
+  const showMic = !!onMicPress && !isGenerating && !value.trim() && !pendingImagePath;
+  const voiceBusy = voiceState === 'downloading' || voiceState === 'transcribing';
+  const voicePlaceholder =
+    voiceState === 'recording'
+      ? 'Listening... tap to send'
+      : voiceState === 'transcribing'
+      ? 'Transcribing...'
+      : voiceState === 'downloading'
+      ? `Downloading voice model ${Math.round(voiceProgress * 100)}%`
+      : null;
   const {colors, typography} = useTheme();
   const {t} = useTranslation();
 
@@ -93,16 +111,34 @@ export const ChatComposer = React.forwardRef<
           ref={ref}
           value={value}
           onChangeText={onChangeText}
-          placeholder={ready ? t('chat.messagePlaceholder') : 'Loading model ...'}
+          placeholder={voicePlaceholder ?? (ready ? t('chat.messagePlaceholder') : 'Loading model ...')}
           placeholderTextColor={colors.textMuted}
           style={[
             styles.input,
             {backgroundColor: colors.surface, color: colors.textPrimary, borderColor: colors.border},
           ]}
-          editable={ready}
+          editable={ready && voiceState === 'idle'}
           multiline
         />
-        {isGenerating ? (
+        {showMic ? (
+          <TouchableOpacity
+            onPress={onMicPress}
+            disabled={!ready || voiceState === 'transcribing'}
+            accessibilityLabel={voiceState === 'recording' ? 'Stop and send' : 'Voice input'}
+            style={[
+              styles.sendButton,
+              {backgroundColor: voiceState === 'recording' ? colors.accent : colors.surfaceContainerHigh},
+              !ready && {opacity: 0.4},
+            ]}>
+            {voiceBusy ? (
+              <ActivityIndicator size="small" color={colors.textPrimary} />
+            ) : voiceState === 'recording' ? (
+              <Square size={14} color={colors.onAccent} fill={colors.onAccent} />
+            ) : (
+              <Mic size={18} color={colors.textPrimary} />
+            )}
+          </TouchableOpacity>
+        ) : isGenerating ? (
           <TouchableOpacity
             onPress={onStop}
             style={[styles.stopButton, {backgroundColor: colors.accent}]}>

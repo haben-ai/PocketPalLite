@@ -70,6 +70,7 @@ import {DottedSpinner} from '../components/DottedSpinner';
 import {ChatLoadingState} from '../components/ChatLoadingState';
 import {ExportImportSheet} from '../components/ExportImportSheet';
 import {speak} from '../services/ttsService';
+import {useVoiceInput} from '../hooks/useVoiceInput';
 import {BraveSearchProvider, formatSearchResultsForContext} from '../services/searchProvider';
 import {getSecret, SECRET_SERVICE} from '../services/secureStorage';
 import {Conversation} from '../types';
@@ -142,6 +143,10 @@ export function ChatScreen({
   const streamingTextRef = useRef<string | null>(null);
   const stoppedRef = useRef(false);
   const composerRef = useRef<TextInput>(null);
+  // Set when the message being answered was spoken, so its reply is read
+  // aloud even if the Settings TTS toggle is off -- a voice question that
+  // gets a silent text answer isn't a voice assistant.
+  const speakNextReplyRef = useRef(false);
 
   const model = getModelById(activeModelId);
   // Header/AI-indicator display name only -- drops tuning-suffix words
@@ -494,9 +499,10 @@ export function ChatScreen({
       await touchConversation(conversationId);
       // Speak the finished reply, not the growing partial text -- reading
       // out a constantly-changing stream would be unusable.
-      if (settings.ttsEnabled) {
+      if (settings.ttsEnabled || speakNextReplyRef.current) {
         speak(assistantMessage.content);
       }
+      speakNextReplyRef.current = false;
       // A short, light tap via the real Taptic Engine API -- RN's core
       // Vibration.vibrate() ignores its duration argument entirely on iOS
       // (it always fires the same strong system "buzz" via
@@ -540,8 +546,8 @@ export function ChatScreen({
     }
   };
 
-  const handleSend = async () => {
-    const trimmed = input.trim();
+  const handleSend = async (textOverride?: string) => {
+    const trimmed = (textOverride ?? input).trim();
     if ((!trimmed && !pendingImagePath) || !engineRef.current || streamingText !== null) {
       return;
     }
@@ -664,6 +670,12 @@ export function ChatScreen({
           },
         ]
       : messages;
+
+  const voice = useVoiceInput(async text => {
+    speakNextReplyRef.current = true;
+    await handleSend(text);
+    speakNextReplyRef.current = false;
+  });
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
@@ -805,7 +817,10 @@ export function ChatScreen({
           ref={composerRef}
           value={input}
           onChangeText={setInput}
-          onSend={handleSend}
+          onSend={() => handleSend()}
+          onMicPress={voice.toggle}
+          voiceState={voice.state}
+          voiceProgress={voice.progress}
           onStop={handleStop}
           onAttach={isVisionModel ? handleAttachMedia : undefined}
           pendingImagePath={pendingImagePath}

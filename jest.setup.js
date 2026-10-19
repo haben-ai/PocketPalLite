@@ -143,3 +143,25 @@ jest.mock('react-native-tts', () => ({
     addEventListener: jest.fn(),
   },
 }));
+
+// Native-only voice input stack (mic capture + whisper.cpp) -- hit via
+// speechToText.ts (ChatScreen.tsx -> RootNavigator.tsx). Both need a real
+// device; nothing in the Jest suite records or transcribes audio.
+jest.mock('@fugood/react-native-audio-pcm-stream', () => ({
+  __esModule: true,
+  default: {
+    init: jest.fn(),
+    start: jest.fn(),
+    stop: jest.fn(() => Promise.resolve('')),
+    on: jest.fn(),
+  },
+}));
+// virtual: whisper.rn's package.json "exports" map has no root entry, so
+// Jest's resolver can't locate it by name (Metro can, via "react-native").
+jest.mock(
+  'whisper.rn',
+  () => ({
+    initWhisper: jest.fn(() => Promise.reject(new Error('whisper.rn is not available under Jest'))),
+  }),
+  {virtual: true},
+);
