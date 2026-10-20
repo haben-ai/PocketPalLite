@@ -36,5 +36,22 @@ target 'PocketPalLite' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # whisper-rn's RNWhisper.mm imports <RNWhisperSpec/RNWhisperSpec.h>, a
+    # header React Native's codegen writes to ios/build/generated/ios during
+    # `pod install`. Its podspec sets its own HEADER_SEARCH_PATHS before
+    # install_modules_dependencies runs, and that folder ends up missing from
+    # the pod target's search path -- so the (existing) header isn't found and
+    # the whole iOS build fails. Adding the folder explicitly fixes it.
+    installer.pods_project.targets.each do |target|
+      next unless target.name == 'whisper-rn'
+      target.build_configurations.each do |config|
+        existing = config.build_settings['HEADER_SEARCH_PATHS']
+        paths = existing.is_a?(Array) ? existing.dup : [existing || '$(inherited)']
+        generated = '"$(PODS_ROOT)/../build/generated/ios"'
+        paths << generated unless paths.include?(generated)
+        config.build_settings['HEADER_SEARCH_PATHS'] = paths
+      end
+    end
   end
 end
