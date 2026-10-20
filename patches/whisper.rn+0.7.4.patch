@@ -1,0 +1,29 @@
+diff --git a/node_modules/whisper.rn/ios/RNWhisper.mm b/node_modules/whisper.rn/ios/RNWhisper.mm
+index f7032f4..6018e75 100644
+--- a/node_modules/whisper.rn/ios/RNWhisper.mm
++++ b/node_modules/whisper.rn/ios/RNWhisper.mm
+@@ -8,7 +8,14 @@
+ #include <cstring>
+ #include <mutex>
+ 
+-#ifdef RCT_NEW_ARCH_ENABLED
++// The codegen header is only needed for the optional TurboModule hook at the
++// bottom of this file. It isn't always on the pod's header search path (it
++// wasn't on this project's iOS CI build, which failed with 'file not found'),
++// so it's only used when it can actually be found -- otherwise this stays a
++// plain RCTBridgeModule (which React Native still loads, via its interop
++// layer, under the New Architecture).
++#if defined(RCT_NEW_ARCH_ENABLED) && __has_include(<RNWhisperSpec/RNWhisperSpec.h>)
++#define RNWHISPER_HAS_SPEC 1
+ #import <RNWhisperSpec/RNWhisperSpec.h>
+ #endif
+ 
+@@ -380,7 +387,7 @@ RCT_EXPORT_METHOD(install:(RCTPromiseResolveBlock)resolve
+     rnwhisper_jsi::cleanupJSIBindings();
+ }
+ 
+-#ifdef RCT_NEW_ARCH_ENABLED
++#ifdef RNWHISPER_HAS_SPEC
+ - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
+     (const facebook::react::ObjCTurboModule::InitParams &)params
+ {
